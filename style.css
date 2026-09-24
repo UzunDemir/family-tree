@@ -53,35 +53,35 @@ html, body {
 /* === УЗЛЫ === */
 .node {
   cursor: pointer;
-  transition: filter 0.2s;
-}
-
-.node:hover {
-  filter: drop-shadow(0 0 8px rgba(74, 158, 255, 0.6));
+  /* ВАЖНО: никаких animation и transform здесь —
+     D3 управляет transform, CSS не должен вмешиваться */
 }
 
 .card-bg {
   fill: #1a1a2e;
   stroke: #2a2a4a;
   stroke-width: 1;
-  transition: stroke 0.3s, stroke-width 0.3s, fill 0.3s;
+  transition: stroke 0.3s, stroke-width 0.3s, fill 0.3s, filter 0.3s;
 }
 
 .node:hover .card-bg {
   stroke: #4a9eff;
   stroke-width: 2;
   fill: #1e1e3a;
+  filter: drop-shadow(0 0 8px rgba(74, 158, 255, 0.6));
 }
 
 .card-bg.highlighted {
   stroke: #4a9eff !important;
   stroke-width: 2.5 !important;
   fill: #1e1e3a !important;
+  filter: drop-shadow(0 0 10px rgba(74, 158, 255, 0.7));
 }
 
 .card-bg.root-highlighted {
   stroke: #a06bff !important;
   stroke-width: 3 !important;
+  filter: drop-shadow(0 0 12px rgba(160, 107, 255, 0.8));
 }
 
 .card-name {
@@ -129,6 +129,7 @@ html, body {
 .link.highlighted {
   stroke: #4a9eff !important;
   stroke-width: 2.5 !important;
+  filter: drop-shadow(0 0 6px rgba(74, 158, 255, 0.6));
 }
 
 .link.dimmed {
@@ -213,14 +214,16 @@ html, body {
   z-index: 10;
 }
 
-/* === АНИМАЦИЯ ПОЯВЛЕНИЯ === */
-/* @keyframes fadeInScale {
-  from { opacity: 0; transform: scale(0.5); }
-  to   { opacity: 1; transform: scale(1); }
-} */
+/* === ПУЛЬСЫ И ЧАСТИЦЫ === */
+/* Не перехватывают клики и наведение */
+.pulse-layer circle,
+.particle-layer circle {
+  pointer-events: none;
+}
 
-.node {
-  animation: fadeInScale 0.6s ease-out backwards;
+/* Свечение для пульсов */
+.pulse-layer circle {
+  mix-blend-mode: screen;
 }
 
 /* === АДАПТИВ === */
@@ -229,20 +232,4 @@ html, body {
   #header .subtitle { display: none; }
   #controls { right: 12px; bottom: 60px; }
   #controls button { padding: 8px 10px; font-size: 12px; }
-}
-
-
-/* Свечение на подсвеченных карточках */
-.card-bg.highlighted {
-  filter: drop-shadow(0 0 8px rgba(74, 158, 255, 0.5));
-}
-
-/* Пульсы не ловят клики */
-.pulse-layer circle {
-  pointer-events: none;
-}
-
-/* Частицы не ловят клики */
-.particle-layer circle {
-  pointer-events: none;
 }
