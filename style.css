@@ -230,3 +230,19 @@ html, body {
   #controls { right: 12px; bottom: 60px; }
   #controls button { padding: 8px 10px; font-size: 12px; }
 }
+
+
+/* Свечение на подсвеченных карточках */
+.card-bg.highlighted {
+  filter: drop-shadow(0 0 8px rgba(74, 158, 255, 0.5));
+}
+
+/* Пульсы не ловят клики */
+.pulse-layer circle {
+  pointer-events: none;
+}
+
+/* Частицы не ловят клики */
+.particle-layer circle {
+  pointer-events: none;
+}
