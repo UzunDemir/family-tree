@@ -1,5 +1,5 @@
 /**
- * Семейное древо Узун — D3.js + бесконечные корни
+ * Семейное древо Узун — D3.js + бесконечные корни (растут ВВЕРХ, ровно)
  */
 
 // === КОНФИГУРАЦИЯ ===
@@ -120,25 +120,53 @@ const JITTER = {
   rotateByDepth: [0, 1.5, 3, 5]
 };
 
-function applyJitter(node) {
-  if (node._jitterApplied) return;
-  node._jitterApplied = true;
+// Вертикальный шаг между поколениями для сгенерированных
+const GENERATION_STEP_Y = 90;
+// Боковое смещение отца/матери (чтобы не слипались)
+const PARENT_SIDE_OFFSET = 35;
 
-  const depth = Math.min(node.depth, JITTER.xByDepth.length - 1);
+function adjustAllPositions(root) {
+  // 1. Реальные предки — с jitter
+  root.descendants().forEach(node => {
+    if (node.data.isGenerated) return;
+    if (node._jitterApplied) return;
 
-  node.xIdeal = node.x;
-  node.yIdeal = node.y;
+    const depth = Math.min(node.depth, JITTER.xByDepth.length - 1);
+    node._jitterApplied = true;
 
-  node.x += hashNoise(node.data.id, 1) * JITTER.xByDepth[depth];
-  node.y += hashNoise(node.data.id, 2) * JITTER.yByDepth[depth];
-  node.rotation = hashNoise(node.data.id, 3) * JITTER.rotateByDepth[depth];
+    node.x += hashNoise(node.data.id, 1) * JITTER.xByDepth[depth];
+    node.y += hashNoise(node.data.id, 2) * JITTER.yByDepth[depth];
+    node.rotation = hashNoise(node.data.id, 3) * JITTER.rotateByDepth[depth];
 
-  if (node.depth >= 2) {
-    node.y -= (node.depth - 1) * 30;
-  }
+    if (node.depth >= 2) {
+      node.y -= (node.depth - 1) * 30;
+    }
+  });
+
+  // 2. Сгенерированные — строго над родителем, ровно вверх
+  const generated = root.descendants()
+    .filter(d => d.data.isGenerated)
+    .sort((a, b) => a.depth - b.depth);
+
+  generated.forEach(node => {
+    const parent = node.parent;
+    if (!parent) return;
+
+    // Отец чуть слева, мать чуть справа
+    const sideOffset = node.data.gender === 'male'
+      ? -PARENT_SIDE_OFFSET
+      : PARENT_SIDE_OFFSET;
+
+    node.x = parent.x + sideOffset;
+    node.y = parent.y - GENERATION_STEP_Y;
+    node.rotation = 0;
+
+    node.xIdeal = node.x;
+    node.yIdeal = node.y;
+  });
 }
 
-root.descendants().forEach(applyJitter);
+adjustAllPositions(root);
 
 // === БЕСКОНЕЧНОСТЬ ===
 function getGenerationStyle(generation) {
@@ -156,6 +184,13 @@ function organicLink(d) {
   const sy = d.source.y + offsetY;
   const tx = d.target.x + offsetX;
   const ty = d.target.y + offsetY;
+
+  // Сгенерированные — прямая вертикальная линия
+  if (d.target.data.isGenerated) {
+    return `M${sx},${sy} L${tx},${ty}`;
+  }
+
+  // Реальные — органическая кривая
   const midY = (sy + ty) / 2;
   const bend = (tx - sx) * 0.25;
   return `M${sx},${sy} C${sx + bend},${midY} ${tx - bend},${midY} ${tx},${ty}`;
@@ -214,11 +249,10 @@ function generateAncestor(childId, childBirth, childGeneration, side) {
   };
 }
 
-// Ищет узел в familyData по id (рекурсивно, обходит все массивы)
+// Ищет узел в familyData (рекурсивно, обходит все ветки)
 function findInFamilyData(node, id) {
   if (node.id === id) return node;
-  if (!node.children) node.children = [];
-  
+  if (!node.children) return null;
   for (const child of node.children) {
     const found = findInFamilyData(child, id);
     if (found) return found;
@@ -226,30 +260,28 @@ function findInFamilyData(node, id) {
   return null;
 }
 
-// Расширяет familyData — добавляет детей к узлу с указанным id
+// Добавляет детей к узлу в familyData
 function extendFamilyData(parentId, newChildren) {
-  // Ищем во всех массивах: parents, grandparents, greatGrandparents
-  const candidates = [
+  const allParents = [
     ...(familyData.parents || []),
     ...(familyData.grandparents || []),
     ...(familyData.greatGrandparents || [])
   ];
 
-  // Рекурсивный поиск
-  function searchInNode(node) {
+  function searchDeep(node) {
     if (node.id === parentId) return node;
     if (node.children) {
       for (const c of node.children) {
-        const found = searchInNode(c);
-        if (found) return found;
+        const f = searchDeep(c);
+        if (f) return f;
       }
     }
     return null;
   }
 
   let target = null;
-  for (const c of candidates) {
-    target = searchInNode(c);
+  for (const p of allParents) {
+    target = searchDeep(p);
     if (target) break;
   }
 
@@ -271,18 +303,17 @@ function loadNextGeneration(datum) {
 
   console.log('✨ Генерирую предков для', datum.data.name, '→', father.name, '+', mother.name);
 
-  // Пробуем найти узел в familyData
+  // Ищем в familyData
   let targetInData = findInFamilyData(familyData, datum.data.id);
 
-  // Если не нашли — узел был сгенерирован, ищем в greatGrandparents рекурсивно
+  // Если не нашли — ищем в сгенерированных ветках
   if (!targetInData) {
-    // Ищем в сгенерированных детях
     const allParents = [
       ...(familyData.parents || []),
       ...(familyData.grandparents || []),
       ...(familyData.greatGrandparents || [])
     ];
-    
+
     function searchDeep(node) {
       if (node.id === datum.data.id) return node;
       if (node.children) {
@@ -293,7 +324,7 @@ function loadNextGeneration(datum) {
       }
       return null;
     }
-    
+
     for (const p of allParents) {
       targetInData = searchDeep(p);
       if (targetInData) break;
@@ -313,20 +344,19 @@ function loadNextGeneration(datum) {
 
 // === ПЕРЕСБОРКА ===
 function rebuildAndRender() {
-  // Сохраняем загруженные id
   const oldLoadedIds = new Set();
   root.descendants().forEach(d => {
     if (d._childrenLoaded) oldLoadedIds.add(d.data.id);
   });
 
-  // Пересобираем
   const newHierarchyData = buildHierarchy(familyData);
   const newRoot = d3.hierarchy(newHierarchyData);
 
   treeLayout(newRoot);
-  newRoot.descendants().forEach(applyJitter);
 
-  // Восстанавливаем флаги
+  // ВАЖНО: правильная функция
+  adjustAllPositions(newRoot);
+
   newRoot.descendants().forEach(d => {
     if (oldLoadedIds.has(d.data.id)) d._childrenLoaded = true;
   });
@@ -515,7 +545,7 @@ if (CONFIG.pulse.enabled) {
 
       const path = linkEl.node();
       if (!path.getTotalLength) return;
-      
+
       const totalLength = path.getTotalLength();
       const baseDelay = (hashNoise(d.target.data.id, 42) + 1) * 1000;
       const t = ((Date.now() + baseDelay) % CONFIG.pulse.speed) / CONFIG.pulse.speed;
@@ -745,6 +775,11 @@ if (CONFIG.breathing.enabled) {
       const now = Date.now();
 
       nodeLayer.selectAll('.node').attr('transform', function(d) {
+        // Сгенерированные не дышат — они должны стоять ровно
+        if (d.data.isGenerated) {
+          return nodeTransform(d, 0, 0);
+        }
+
         const amp = CONFIG.breathing.baseAmp + d.depth * CONFIG.breathing.ampPerDepth;
 
         const dur = CONFIG.breathing.minDuration +
