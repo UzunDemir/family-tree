@@ -1,6 +1,9 @@
 /**
  * Семейное древо Узун — D3.js + бесконечные корни
- * Корни растут ВНИЗ по экрану, безымянные
+ * Правила:
+ *   - Любой узел (реальный или сгенерированный) ВСЕГДА ниже родителя
+ *   - Сгенерированные узлы БЕЗ имён (только пол и дата)
+ *   - Jitter только по X и вниз по Y
  */
 
 // === КОНФИГУРАЦИЯ ===
@@ -96,7 +99,7 @@ function hashNoise(id, seed = 0) {
   for (let i = 0; i < id.length; i++) {
     h = (h * 31 + id.charCodeAt(i)) | 0;
   }
-  return ((h % 1000) / 1000) * 2 - 1;
+  return ((h % 1000) / 1000) * 2 - 1;  // диапазон [-1, 1]
 }
 
 // === НЕРОВНОЕ РАСПОЛОЖЕНИЕ ===
@@ -106,28 +109,39 @@ const JITTER = {
   rotateByDepth: [0, 1.5, 3, 5]
 };
 
+// Шаг для сгенерированных
 const GENERATION_STEP_Y = 90;
+// Минимальный шаг для реальных — гарантия, что ребёнок ниже родителя
+const GENERATION_STEP_Y_MIN = 80;
+// Боковое смещение отца/матери
 const PARENT_SIDE_OFFSET = 35;
 
 function adjustAllPositions(root) {
-  // 1. Реальные предки — с jitter
-  root.descendants().forEach(node => {
-    if (node.data.isGenerated) return;
-    if (node._jitterApplied) return;
+  // === 1. РЕАЛЬНЫЕ ПРЕДКИ ===
+  // Всегда ниже родителя, но с jitter по X и наклоном
+  const realNodes = root.descendants()
+    .filter(d => !d.data.isGenerated)
+    .sort((a, b) => a.depth - b.depth);
 
+  realNodes.forEach(node => {
     const depth = Math.min(node.depth, JITTER.xByDepth.length - 1);
-    node._jitterApplied = true;
 
     node.x += hashNoise(node.data.id, 1) * JITTER.xByDepth[depth];
     node.y += hashNoise(node.data.id, 2) * JITTER.yByDepth[depth];
     node.rotation = hashNoise(node.data.id, 3) * JITTER.rotateByDepth[depth];
 
-    if (node.depth >= 2) {
-      node.y -= (node.depth - 1) * 30;
+    // ГЛАВНОЕ ПРАВИЛО: ребёнок ВСЕГДА ниже родителя
+    if (node.parent) {
+      const minY = node.parent.y + GENERATION_STEP_Y_MIN;
+      if (node.y < minY) {
+        // Подтягиваем вниз + небольшой случайный разброс ТОЛЬКО вниз
+        node.y = minY + Math.abs(hashNoise(node.data.id, 4)) * 15;
+      }
     }
   });
 
-  // 2. Сгенерированные — растут ВНИЗ по экрану
+  // === 2. СГЕНЕРИРОВАННЫЕ ===
+  // Всегда ниже родителя, jitter только вниз и в стороны
   const generated = root.descendants()
     .filter(d => d.data.isGenerated)
     .sort((a, b) => a.depth - b.depth);
@@ -141,16 +155,13 @@ function adjustAllPositions(root) {
       : PARENT_SIDE_OFFSET;
 
     const sideJitter = hashNoise(node.data.id, 11) * 25;
-    const yJitter = hashNoise(node.data.id, 12) * 20;
-    const rotation = hashNoise(node.data.id, 13) * 4;
+    // ТОЛЬКО ВНИЗ — модуль числа
+    const yJitter = Math.abs(hashNoise(node.data.id, 12)) * 20;
 
-    // ПЛЮС — сгенерированные уходят ВНИЗ по экрану
+    // ГЛАВНОЕ ПРАВИЛО
     node.x = parent.x + baseSideOffset + sideJitter;
     node.y = parent.y + GENERATION_STEP_Y + yJitter;
-    node.rotation = rotation;
-
-    node.xIdeal = node.x;
-    node.yIdeal = node.y;
+    node.rotation = hashNoise(node.data.id, 13) * 4;
   });
 }
 
@@ -221,7 +232,7 @@ function generateAncestor(childId, childBirth, childGeneration, side) {
 
   return {
     id,
-    name: '',           // ← БЕЗ ИМЕНИ
+    name: '',
     birth,
     gender,
     generation: childGeneration + 1,
@@ -247,11 +258,8 @@ function loadNextGeneration(datum) {
     console.log('⛔ Достигнут максимум поколений');
     return false;
   }
-  if (datum._childrenLoaded) {
-    return false;
-  }
+  if (datum._childrenLoaded) return false;
 
-  // НЕ генерируем, если у узла УЖЕ есть дети
   if (datum.data.children && datum.data.children.length > 0) {
     return false;
   }
@@ -426,20 +434,20 @@ function renderTree(animateEntrance = false) {
     .attr('cy', 0)
     .attr('r', CONFIG.avatarRadius);
 
-  // Инициалы — только если есть имя, иначе "?"
+  // Инициалы — "?" для сгенерированных
   nodesEnter.append('text')
     .attr('class', 'avatar-text')
     .attr('x', avatarX)
     .attr('y', 0)
     .text(d => getInitials(d.data.name));
 
-  // Имя — только если есть
+  // Имя — пусто для сгенерированных
   nodesEnter.append('text')
     .attr('class', 'card-name')
     .attr('x', avatarX + 26)
     .attr('y', -6)
     .text(d => {
-      if (!d.data.name) return '';          // ← пусто для сгенерированных
+      if (!d.data.name) return '';
       const parts = d.data.name.split(' ');
       return parts.length > 1 ? `${parts[0]} ${parts[1]}` : d.data.name;
     });
@@ -551,7 +559,8 @@ function attachNodeHandlers(selection) {
       ? '<div class="row" style="color:#a06bff">✨ Восстановлено по роду</div>'
       : '';
 
-    const displayName = d.data.name || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
+    const displayName = d.data.name
+      || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
 
     tooltip
       .style('opacity', 1)
@@ -747,7 +756,9 @@ if (CONFIG.breathing.enabled) {
         const t = (now - startTime) / dur + phase;
 
         const dx = Math.sin(t) * finalAmp;
-        const dy = Math.cos(t * 0.7) * finalAmp * 0.6;
+        // ВАЖНО: дыхание вниз тоже только положительное,
+        // чтобы не поднять узел выше родителя
+        const dy = Math.abs(Math.cos(t * 0.7)) * finalAmp * 0.3;
 
         return nodeTransform(d, dx, dy);
       });
