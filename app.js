@@ -1,43 +1,45 @@
 /**
- * Семейное древо Узун — D3.js + Infinite Cyber-Roots v2.0
+ * Семейное древо Узун — D3.js + бесконечные корни
+ * Корни растут ВНИЗ по экрану, безымянные
  */
 
-// === КОНФИГУРАЦИЯ С УСИЛЕННЫМ ВИЗУАЛОМ ===
+// === КОНФИГУРАЦИЯ ===
 const CONFIG = {
-  cardWidth: 145,
-  cardHeight: 58,
-  avatarRadius: 19,
+  cardWidth: 140,
+  cardHeight: 56,
+  avatarRadius: 18,
   maxGeneration: 3,
 
   infinity: {
     minOpacity: 0.15,
-    minScale: 0.22,
+    minScale: 0.35,
     opacityFalloff: 0.85,
-    scaleFalloff: 0.7
+    scaleFalloff: 0.65
   },
 
-  duration: { zoom: 800, highlight: 350, entrance: 700 },
+  duration: { zoom: 750, highlight: 300, entrance: 600 },
 
   breathing: {
     enabled: true,
-    baseAmp: 5,
-    ampPerDepth: 3.5,
-    minDuration: 3500,
-    maxDuration: 6500
+    baseAmp: 4,
+    ampPerDepth: 3,
+    minDuration: 4000,
+    maxDuration: 7000
   },
 
-  pulse: { enabled: true, speed: 3200, radius: 3.5, glow: true },
-  particles: { enabled: true, onHover: 14, onWave: 10 },
-  wave: { stepDelay: 150, duration: 450 },
+  pulse: { enabled: true, speed: 4000, radius: 3, glow: true },
+  particles: { enabled: true, onHover: 8, onWave: 6 },
+  wave: { stepDelay: 180, duration: 400 },
 
   infiniteRoots: {
     enabled: true,
-    autoLoadDelay: 600,
-    maxGenerations: 10
+    loadDepth: 3,
+    autoLoadDelay: 800,
+    maxGenerations: 12
   }
 };
 
-// === ИНИЦИАЛИЗАЦИЯ СЛОЕВ ===
+// === ИНИЦИАЛИЗАЦИЯ ===
 const container = document.getElementById('tree-container');
 const tooltip = d3.select('#tooltip');
 const width = window.innerWidth;
@@ -49,17 +51,13 @@ const svg = d3.select('#tree-container')
   .attr('height', height);
 
 const defs = svg.append('defs');
-
-// Ультра-неоновый Glow фильтр
 const glowFilter = defs.append('filter')
   .attr('id', 'glow')
-  .attr('x', '-100%').attr('y', '-100%')
-  .attr('width', '300%').attr('height', '300%');
-glowFilter.append('feGaussianBlur').attr('stdDeviation', '5').attr('result', 'blur');
-glowFilter.append('feComponentTransfer').attr('in', 'blur').attr('result', 'boost')
-  .append('feFuncA').attr('type', 'linear').attr('slope', '2.5');
+  .attr('x', '-50%').attr('y', '-50%')
+  .attr('width', '200%').attr('height', '200%');
+glowFilter.append('feGaussianBlur').attr('stdDeviation', '3').attr('result', 'blur');
 const feMerge = glowFilter.append('feMerge');
-feMerge.append('feMergeNode').attr('in', 'boost');
+feMerge.append('feMergeNode').attr('in', 'blur');
 feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
 
 const g = svg.append('g').attr('class', 'main-group');
@@ -69,94 +67,96 @@ const nodeLayer     = g.append('g').attr('class', 'nodes-layer');
 const particleLayer = g.append('g').attr('class', 'particle-layer');
 
 const offsetX = width / 2;
-const offsetY = height * 0.12;
+const offsetY = height * 0.15;
 
-// === ЗУМ С ПЛАВНЫМ ИНДИКАТОРОМ ===
+// === ЗУМ ===
 const zoom = d3.zoom()
-  .scaleExtent([0.1, 4])
+  .scaleExtent([0.15, 3])
   .on('zoom', (event) => {
     g.attr('transform', event.transform);
-    if (CONFIG.infiniteRoots.enabled && event.transform.k > 1.15) {
+    if (CONFIG.infiniteRoots.enabled && event.transform.k > 1.2) {
       scheduleAutoLoad();
     }
   });
 
 svg.call(zoom);
 
-// === ПОСТРОЕНИЕ ДЕРЕВА ===
+// === ПОСТРОЕНИЕ ===
 let root = d3.hierarchy(buildHierarchy(familyData));
-const CARD_MIN_DX = CONFIG.cardWidth + 45;
 
 const treeLayout = d3.tree()
-  .size([width * 0.92, height * 0.65])
-  .separation((a, b) => (a.parent === b.parent ? CARD_MIN_DX : CARD_MIN_DX * 1.35) / (width * 0.92));
+  .size([width * 0.85, height * 0.7])
+  .separation((a, b) => (a.parent === b.parent ? 1.4 : 2.2));
 
 treeLayout(root);
 
-// === ШУМ И ФИЗИКА УЗЛОВ ===
+// === ШУМ ===
 function hashNoise(id, seed = 0) {
   let h = seed;
   for (let i = 0; i < id.length; i++) {
-    h = (h * 33 + id.charCodeAt(i)) | 0;
+    h = (h * 31 + id.charCodeAt(i)) | 0;
   }
   return ((h % 1000) / 1000) * 2 - 1;
 }
 
+// === НЕРОВНОЕ РАСПОЛОЖЕНИЕ ===
 const JITTER = {
-  yByDepth: [8, 12, 18, 24],
-  rotateByDepth: [0, 0.8, 1.2, 1.8]
+  xByDepth:      [20, 35, 55, 80],
+  yByDepth:      [10, 20, 35, 55],
+  rotateByDepth: [0, 1.5, 3, 5]
 };
 
-const GENERATION_STEP_Y = 60;
-const GENERATION_STEP_Y_MIN = 52;
-const PARENT_SIDE_OFFSET = 12;
-
-function enforceNoOverlapX(root) {
-  const allNodes = root.descendants();
-  const byDepth = {};
-  allNodes.forEach(d => {
-    if (!byDepth[d.depth]) byDepth[d.depth] = [];
-    byDepth[d.depth].push(d);
-  });
-
-  Object.values(byDepth).forEach(nodesAtDepth => {
-    nodesAtDepth.sort((a, b) => a.x - b.x);
-    for (let i = 1; i < nodesAtDepth.length; i++) {
-      const prev = nodesAtDepth[i - 1];
-      const curr = nodesAtDepth[i];
-      const dx = curr.x - prev.x;
-      if (dx < CARD_MIN_DX) {
-        const push = (CARD_MIN_DX - dx) / 2 + 1;
-        prev.x -= push;
-        curr.x += push;
-      }
-    }
-  });
-}
+const GENERATION_STEP_Y = 90;
+const PARENT_SIDE_OFFSET = 35;
 
 function adjustAllPositions(root) {
+  // 1. Реальные предки — с jitter
   root.descendants().forEach(node => {
-    const depth = Math.min(node.depth, JITTER.yByDepth.length - 1);
-    if (!node.data.isGenerated) {
-      node.y += Math.abs(hashNoise(node.data.id, 2)) * JITTER.yByDepth[depth];
-      node.rotation = hashNoise(node.data.id, 3) * JITTER.rotateByDepth[depth];
-    } else {
-      const parent = node.parent;
-      if (parent) {
-        const baseSideOffset = node.data.gender === 'male' ? -PARENT_SIDE_OFFSET : PARENT_SIDE_OFFSET;
-        const depthFactor = Math.max(0.45, 1 - node.depth * 0.07);
-        node.x = parent.x + baseSideOffset;
-        node.y = parent.y + GENERATION_STEP_Y * depthFactor;
-        node.rotation = hashNoise(node.data.id, 13) * 2.5;
-      }
+    if (node.data.isGenerated) return;
+    if (node._jitterApplied) return;
+
+    const depth = Math.min(node.depth, JITTER.xByDepth.length - 1);
+    node._jitterApplied = true;
+
+    node.x += hashNoise(node.data.id, 1) * JITTER.xByDepth[depth];
+    node.y += hashNoise(node.data.id, 2) * JITTER.yByDepth[depth];
+    node.rotation = hashNoise(node.data.id, 3) * JITTER.rotateByDepth[depth];
+
+    if (node.depth >= 2) {
+      node.y -= (node.depth - 1) * 30;
     }
   });
-  enforceNoOverlapX(root);
+
+  // 2. Сгенерированные — растут ВНИЗ по экрану
+  const generated = root.descendants()
+    .filter(d => d.data.isGenerated)
+    .sort((a, b) => a.depth - b.depth);
+
+  generated.forEach(node => {
+    const parent = node.parent;
+    if (!parent) return;
+
+    const baseSideOffset = node.data.gender === 'male'
+      ? -PARENT_SIDE_OFFSET
+      : PARENT_SIDE_OFFSET;
+
+    const sideJitter = hashNoise(node.data.id, 11) * 25;
+    const yJitter = hashNoise(node.data.id, 12) * 20;
+    const rotation = hashNoise(node.data.id, 13) * 4;
+
+    // ПЛЮС — сгенерированные уходят ВНИЗ по экрану
+    node.x = parent.x + baseSideOffset + sideJitter;
+    node.y = parent.y + GENERATION_STEP_Y + yJitter;
+    node.rotation = rotation;
+
+    node.xIdeal = node.x;
+    node.yIdeal = node.y;
+  });
 }
 
 adjustAllPositions(root);
 
-// === СТИЛИ ГЕНЕРАЦИЙ И СВЯЗИ ===
+// === БЕСКОНЕЧНОСТЬ ===
 function getGenerationStyle(generation) {
   const t = generation / CONFIG.maxGeneration;
   const { minOpacity, minScale, opacityFalloff, scaleFalloff } = CONFIG.infinity;
@@ -166,68 +166,123 @@ function getGenerationStyle(generation) {
   };
 }
 
+// === СВЯЗИ ===
 function organicLink(d) {
   const sx = d.source.x + offsetX;
   const sy = d.source.y + offsetY;
   const tx = d.target.x + offsetX;
   const ty = d.target.y + offsetY;
-  const bendFactor = d.target.data.isGenerated ? 0.12 : 0.22;
+
+  const isGenerated = d.target.data.isGenerated;
+  const bendFactor = isGenerated ? 0.15 : 0.25;
+
   const midY = (sy + ty) / 2;
   const bend = (tx - sx) * bendFactor;
+
   return `M${sx},${sy} C${sx + bend},${midY} ${tx - bend},${midY} ${tx},${ty}`;
 }
 
+// === TRANSFORM ===
 function nodeTransform(d, dx = 0, dy = 0) {
   const { scale } = getGenerationStyle(d.depth);
-  return `translate(${d.x + offsetX + dx}, ${d.y + offsetY + dy}) rotate(${d.rotation || 0}) scale(${scale})`;
+  const rot = d.rotation || 0;
+  return `translate(${d.x + offsetX + dx}, ${d.y + offsetY + dy}) rotate(${rot}) scale(${scale})`;
 }
 
+// === ВСПОМОГАТЕЛЬНЫЕ ===
 function getInitials(name) {
-  if (!name) return '⚡';
+  if (!name) return '?';
   const parts = name.split(' ').filter(Boolean);
-  return parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0][0].toUpperCase();
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return parts[0] ? parts[0][0].toUpperCase() : '?';
 }
 
-// === ПРОЦЕДУРНАЯ ГЕНЕРАЦИЯ (ИСПРАВЛЕНАЯ) ===
+// ============================================
+// === ПРОЦЕДУРНАЯ ГЕНЕРАЦИЯ ПРЕДКОВ ===
+// ============================================
+const IR = CONFIG.infiniteRoots;
+
+// Генерируем БЕЗЫМЯННОГО предка — только пол, дата, id
 function generateAncestor(childId, childBirth, childGeneration, side) {
   const gender = side === 'father' ? 'male' : 'female';
   const id = `gen_${childId}_${side}`;
+
   let birth = null;
   if (childBirth) {
     const yearMatch = childBirth.match(/\d{4}/);
     if (yearMatch) {
-      const parentYear = parseInt(yearMatch[0]) - (24 + Math.abs(hashNoise(id, 5)) * 12);
-      const day = String(Math.floor(Math.abs(hashNoise(id, 6)) * 27) + 1).padStart(2, '0');
-      const month = String(Math.floor(Math.abs(hashNoise(id, 7)) * 11) + 1).padStart(2, '0');
+      const childYear = parseInt(yearMatch[0]);
+      const parentYear = childYear - (25 + Math.abs(hashNoise(id, 5)) * 10);
+      const day = String(Math.floor(Math.abs(hashNoise(id, 6)) * 28) + 1).padStart(2, '0');
+      const month = String(Math.floor(Math.abs(hashNoise(id, 7)) * 12) + 1).padStart(2, '0');
       birth = `${day}.${month}.${Math.floor(parentYear)}`;
     }
   }
-  return { id, name: '', birth, gender, generation: childGeneration + 1, isGenerated: true, children: [] };
+
+  return {
+    id,
+    name: '',           // ← БЕЗ ИМЕНИ
+    birth,
+    gender,
+    generation: childGeneration + 1,
+    isGenerated: true,
+    children: []
+  };
 }
 
-function findInFamilyData(node, targetId) {
-  if (!node) return null;
-  if (node.id === targetId) return node;
-  if (node.children) {
-    for (const child of node.children) {
-      const found = findInFamilyData(child, targetId);
-      if (found) return found;
-    }
+// Ищет узел в familyData
+function findInFamilyData(node, id) {
+  if (node.id === id) return node;
+  if (!node.children) return null;
+  for (const child of node.children) {
+    const found = findInFamilyData(child, id);
+    if (found) return found;
   }
   return null;
 }
 
+// Загружает следующее поколение
 function loadNextGeneration(datum) {
-  if (datum.depth >= CONFIG.infiniteRoots.maxGenerations || datum._childrenLoaded) return false;
-  if (datum.data.children && datum.data.children.length > 0) return false;
+  if (datum.depth >= IR.maxGenerations) {
+    console.log('⛔ Достигнут максимум поколений');
+    return false;
+  }
+  if (datum._childrenLoaded) {
+    return false;
+  }
+
+  // НЕ генерируем, если у узла УЖЕ есть дети
+  if (datum.data.children && datum.data.children.length > 0) {
+    return false;
+  }
 
   const father = generateAncestor(datum.data.id, datum.data.birth, datum.depth, 'father');
   const mother = generateAncestor(datum.data.id, datum.data.birth, datum.depth, 'mother');
 
+  console.log('✨ Генерирую предков для', datum.data.name || '(безымянный)');
+
   let targetInData = findInFamilyData(familyData, datum.data.id);
-  if (!targetInData && familyData.parents) {
-    for (const p of familyData.parents) {
-      targetInData = findInFamilyData(p, datum.data.id);
+
+  if (!targetInData) {
+    const allParents = [
+      ...(familyData.parents || []),
+      ...(familyData.grandparents || []),
+      ...(familyData.greatGrandparents || [])
+    ];
+
+    function searchDeep(node) {
+      if (node.id === datum.data.id) return node;
+      if (node.children) {
+        for (const c of node.children) {
+          const f = searchDeep(c);
+          if (f) return f;
+        }
+      }
+      return null;
+    }
+
+    for (const p of allParents) {
+      targetInData = searchDeep(p);
       if (targetInData) break;
     }
   }
@@ -238,122 +293,170 @@ function loadNextGeneration(datum) {
     datum._childrenLoaded = true;
     return true;
   }
+
+  console.warn('⚠️ Не найден в familyData:', datum.data.id);
   return false;
 }
 
+// === ПЕРЕСБОРКА ===
 function rebuildAndRender() {
   const oldLoadedIds = new Set();
-  root.descendants().forEach(d => { if (d._childrenLoaded) oldLoadedIds.add(d.data.id); });
+  root.descendants().forEach(d => {
+    if (d._childrenLoaded) oldLoadedIds.add(d.data.id);
+  });
 
-  const newRoot = d3.hierarchy(buildHierarchy(familyData));
+  const newHierarchyData = buildHierarchy(familyData);
+  const newRoot = d3.hierarchy(newHierarchyData);
+
   treeLayout(newRoot);
   adjustAllPositions(newRoot);
 
-  newRoot.descendants().forEach(d => { if (oldLoadedIds.has(d.data.id)) d._childrenLoaded = true; });
+  newRoot.descendants().forEach(d => {
+    if (oldLoadedIds.has(d.data.id)) d._childrenLoaded = true;
+  });
+
   root = newRoot;
   renderTree(true);
 }
 
+// === АВТОЗАГРУЗКА ===
 let autoLoadTimer = null;
 function scheduleAutoLoad() {
   clearTimeout(autoLoadTimer);
   autoLoadTimer = setTimeout(() => {
     const candidates = root.descendants()
-      .filter(d => !d._childrenLoaded && (!d.data.children || d.data.children.length === 0))
+      .filter(d => !d._childrenLoaded)
+      .filter(d => !d.data.children || d.data.children.length === 0)
       .sort((a, b) => b.depth - a.depth);
 
     if (candidates.length === 0) return;
+
     let loaded = 0;
     for (const d of candidates.slice(0, 3)) {
       if (loadNextGeneration(d)) loaded++;
+      if (loaded >= 3) break;
     }
+
     if (loaded > 0) {
+      console.log(`🌌 Загружено ${loaded} новых предков`);
       rebuildAndRender();
       showDepthStatus();
     }
-  }, CONFIG.infiniteRoots.autoLoadDelay);
+  }, IR.autoLoadDelay);
+}
+
+function manualLoad(datum) {
+  if (loadNextGeneration(datum)) {
+    rebuildAndRender();
+    showDepthStatus();
+  }
 }
 
 function showDepthStatus() {
   const deepest = root.descendants().reduce((max, d) => Math.max(max, d.depth), 0);
   const status = document.getElementById('infinite-status');
   if (status) {
-    status.textContent = `🌌 Глубина кибер-рода: ${deepest + 1} уровней`;
+    status.textContent = `🌌 Глубина рода: ${deepest + 1} поколений`;
     status.style.opacity = 1;
-    setTimeout(() => { status.style.opacity = 0.5; }, 2500);
+    setTimeout(() => { status.style.opacity = 0.4; }, 2000);
   }
 }
 
-// === РЕНДЕРИНГ СЕТИ И УЗЛОВ ===
+// ============================================
+// === РЕНДЕР ===
+// ============================================
 let links = linkLayer.selectAll('.link');
 let nodes = nodeLayer.selectAll('.node');
+let pulses = pulseLayer.selectAll('.pulse');
 
 function renderTree(animateEntrance = false) {
-  links = linkLayer.selectAll('.link').data(root.links(), d => d.target.data.id);
-  links.exit().transition().duration(400).style('opacity', 0).remove();
+  // Связи
+  links = linkLayer.selectAll('.link')
+    .data(root.links(), d => d.target.data.id);
+
+  links.exit().remove();
 
   const linksEnter = links.enter()
     .append('path')
     .attr('class', 'link')
     .attr('d', organicLink)
-    .attr('stroke', d => `rgba(0, 243, 255, ${getGenerationStyle(d.target.depth).opacity * 0.6})`)
-    .attr('stroke-width', d => Math.max(0.6, 2 * getGenerationStyle(d.target.depth).scale))
-    .attr('filter', 'url(#glow)');
+    .attr('stroke', d => {
+      const { opacity } = getGenerationStyle(d.target.depth);
+      return `rgba(74, 158, 255, ${opacity * 0.5})`;
+    })
+    .attr('stroke-width', d => {
+      const { scale } = getGenerationStyle(d.target.depth);
+      return Math.max(0.5, 1.5 * scale);
+    });
 
-  if (animateEntrance) linksEnter.style('opacity', 0).transition().duration(600).style('opacity', 1);
+  if (animateEntrance) {
+    linksEnter.style('opacity', 0).transition().duration(600).style('opacity', 1);
+  }
+
   links = linksEnter.merge(links);
   links.attr('d', organicLink);
 
-  nodes = nodeLayer.selectAll('.node').data(root.descendants(), d => d.data.id);
-  nodes.exit().transition().duration(400).style('opacity', 0).remove();
+  // Узлы
+  nodes = nodeLayer.selectAll('.node')
+    .data(root.descendants(), d => d.data.id);
+
+  nodes.exit().remove();
 
   const nodesEnter = nodes.enter()
     .append('g')
     .attr('class', 'node')
+    .attr('data-id', d => d.data.id)
     .attr('transform', d => nodeTransform(d))
     .style('opacity', animateEntrance ? 0 : d => getGenerationStyle(d.depth).opacity)
     .style('cursor', 'pointer');
 
-  // Неоновая подложка карточки
   nodesEnter.append('rect')
     .attr('class', 'card-bg')
     .attr('x', -CONFIG.cardWidth / 2)
     .attr('y', -CONFIG.cardHeight / 2)
     .attr('width', CONFIG.cardWidth)
     .attr('height', CONFIG.cardHeight)
-    .attr('rx', 12)
-    .attr('filter', 'url(#glow)');
+    .attr('rx', 10);
 
   const avatarX = -CONFIG.cardWidth / 2 + 28;
 
   nodesEnter.append('circle')
     .attr('class', d => `avatar-circle ${d.data.gender}`)
-    .attr('cx', avatarX).attr('cy', 0)
+    .attr('cx', avatarX)
+    .attr('cy', 0)
     .attr('r', CONFIG.avatarRadius);
 
+  // Инициалы — только если есть имя, иначе "?"
   nodesEnter.append('text')
     .attr('class', 'avatar-text')
-    .attr('x', avatarX).attr('y', 1)
+    .attr('x', avatarX)
+    .attr('y', 0)
     .text(d => getInitials(d.data.name));
 
+  // Имя — только если есть
   nodesEnter.append('text')
     .attr('class', 'card-name')
-    .attr('x', avatarX + 28).attr('y', -6)
+    .attr('x', avatarX + 26)
+    .attr('y', -6)
     .text(d => {
-      if (!d.data.name) return 'Nexus Node';
+      if (!d.data.name) return '';          // ← пусто для сгенерированных
       const parts = d.data.name.split(' ');
       return parts.length > 1 ? `${parts[0]} ${parts[1]}` : d.data.name;
     });
 
+  // Дата
   nodesEnter.append('text')
     .attr('class', 'card-date')
-    .attr('x', avatarX + 28).attr('y', 12)
-    .text(d => d.data.birth || '00.00.0000');
+    .attr('x', avatarX + 26)
+    .attr('y', 10)
+    .text(d => d.data.birth || '—');
 
   attachNodeHandlers(nodesEnter);
 
   if (animateEntrance) {
-    nodesEnter.transition().duration(700).delay(d => d.depth * 80)
+    nodesEnter.transition()
+      .duration(600)
+      .delay(d => d.depth * 100)
       .style('opacity', d => getGenerationStyle(d.depth).opacity);
   }
 
@@ -366,95 +469,134 @@ function renderTree(animateEntrance = false) {
 
 function renderPulses() {
   if (!CONFIG.pulse.enabled) return;
-  const pulses = pulseLayer.selectAll('.pulse').data(root.links(), d => d.target.data.id);
+
+  pulses = pulseLayer.selectAll('.pulse')
+    .data(root.links(), d => d.target.data.id);
+
   pulses.exit().remove();
 
-  pulses.enter()
+  pulses = pulses.enter()
     .append('circle')
-    .attr('class', d => d.target.data.isGenerated ? 'pulse generated' : 'pulse real')
+    .attr('class', 'pulse')
     .attr('r', CONFIG.pulse.radius)
-    .attr('fill', d => d.target.data.isGenerated ? '#7a7a99' : (d.target.data.gender === 'male' ? '#00f3ff' : '#ff007f'))
-    .attr('filter', 'url(#glow)')
+    .attr('fill', d => d.target.data.gender === 'male' ? '#4a9eff' : '#ff6bb0')
+    .attr('opacity', 0)
+    .attr('filter', CONFIG.pulse.glow ? 'url(#glow)' : null)
     .merge(pulses);
 }
 
 function updateStats() {
   const totalPeople = root.descendants().length;
   const deepest = root.descendants().reduce((max, d) => Math.max(max, d.depth), 0);
-  const statsEl = document.getElementById('stats');
-  if (statsEl) statsEl.textContent = `⚡ Узлов: ${totalPeople} · Поколений: ${deepest + 1}`;
+  document.getElementById('stats').textContent =
+    `👥 ${totalPeople} человек · ${deepest + 1} поколений`;
 }
 
-// === КИБЕР-ПУЛЬСЫ ПО СВЯЗЯМ ===
+// === ПУЛЬСЫ ===
 if (CONFIG.pulse.enabled) {
   function animatePulses() {
     pulseLayer.selectAll('.pulse').each(function(d) {
       const pulse = d3.select(this);
-      const linkEl = linkLayer.selectAll('.link').filter(l => l.target.data.id === d.target.data.id);
+      const linkEl = linkLayer.selectAll('.link')
+        .filter(l => l.target.data.id === d.target.data.id);
+
       if (linkEl.empty()) return;
 
       const path = linkEl.node();
       if (!path.getTotalLength) return;
 
-      const len = path.getTotalLength();
-      const speed = CONFIG.pulse.speed * (d.target.data.isGenerated ? 1.2 : 0.7);
-      const t = ((Date.now() + hashNoise(d.target.data.id, 99) * 1000) % speed) / speed;
-      const point = path.getPointAtLength(t * len);
+      const totalLength = path.getTotalLength();
+      const baseDelay = (hashNoise(d.target.data.id, 42) + 1) * 1000;
+      const t = ((Date.now() + baseDelay) % CONFIG.pulse.speed) / CONFIG.pulse.speed;
+      const point = path.getPointAtLength(t * totalLength);
 
-      pulse.attr('cx', point.x).attr('cy', point.y).attr('opacity', Math.sin(t * Math.PI) * 0.9);
+      pulse
+        .attr('cx', point.x)
+        .attr('cy', point.y)
+        .attr('opacity', Math.sin(t * Math.PI) * 0.9);
     });
     requestAnimationFrame(animatePulses);
   }
   animatePulses();
 }
 
-// === ИНТЕРАКТИВ ИЧАСТИЦЫ ===
+// === ОБРАБОТЧИКИ ===
 function attachNodeHandlers(selection) {
-  selection.on('mouseenter', (event, d) => spawnParticles(d, CONFIG.particles.onHover));
+  selection.on('mouseenter', (event, d) => {
+    spawnParticles(d, CONFIG.particles.onHover);
+  });
+
   selection.on('click', (event, d) => {
     event.stopPropagation();
-    const scale = 1.7;
+
+    const scale = 1.6;
     const x = width / 2 - (d.x + offsetX) * scale;
     const y = height / 2 - (d.y + offsetY) * scale;
 
-    svg.transition().duration(CONFIG.duration.zoom)
+    svg.transition()
+      .duration(CONFIG.duration.zoom)
       .call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(scale));
 
     animateAncestorWave(d);
-    if (!d._childrenLoaded) setTimeout(() => { loadNextGeneration(d); rebuildAndRender(); }, 300);
+
+    if (CONFIG.infiniteRoots.enabled && !d._childrenLoaded) {
+      setTimeout(() => manualLoad(d), 400);
+    }
   });
 
   selection.on('mouseover', (event, d) => {
-    tooltip.style('opacity', 1)
+    const genLabel = d.depth === 0 ? 'Младшее поколение' : `${d.depth}-е поколение от младшего`;
+    const genderLabel = d.data.gender === 'male' ? 'Мужской' : 'Женский';
+    const generatedLabel = d.data.isGenerated
+      ? '<div class="row" style="color:#a06bff">✨ Восстановлено по роду</div>'
+      : '';
+
+    const displayName = d.data.name || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
+
+    tooltip
+      .style('opacity', 1)
       .html(`
-        <strong style="color: #00f3ff;">${d.data.name || 'Неизвестный узел'}</strong>
-        <div class="row">Метка времени: <span>${d.data.birth || 'N/A'}</span></div>
-        <div class="row">Уровень ветки: <span>Генерация #${d.depth + 1}</span></div>
-        ${d.data.isGenerated ? '<div class="row" style="color:#ff007f">✨ Автосинтезированный корень</div>' : ''}
+        <strong>${displayName}</strong>
+        <div class="row">Дата рождения: <span>${d.data.birth || 'неизвестна'}</span></div>
+        <div class="row">Поколение: <span>${genLabel}</span></div>
+        <div class="row">Пол: <span>${genderLabel}</span></div>
+        ${d.children ? `<div class="row">Детей в древе: <span>${d.children.length}</span></div>` : ''}
+        ${generatedLabel}
       `)
       .style('left', (event.pageX + 15) + 'px')
       .style('top', (event.pageY - 15) + 'px');
-  }).on('mousemove', (event) => {
-    tooltip.style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-  }).on('mouseout', () => tooltip.style('opacity', 0));
+  });
+
+  selection.on('mousemove', (event) => {
+    tooltip
+      .style('left', (event.pageX + 15) + 'px')
+      .style('top', (event.pageY - 15) + 'px');
+  });
+
+  selection.on('mouseout', () => {
+    tooltip.style('opacity', 0);
+  });
 }
 
-function spawnParticles(d, count) {
+// === ЧАСТИЦЫ ===
+function spawnParticles(d, count = CONFIG.particles.onHover) {
   if (!CONFIG.particles.enabled) return;
+
   const baseX = d.x + offsetX;
   const baseY = d.y + offsetY;
-  const color = d.data.gender === 'male' ? '#00f3ff' : '#ff007f';
+  const color = d.data.gender === 'male' ? '#4a9eff' : '#ff6bb0';
 
   for (let i = 0; i < count; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 40 + Math.random() * 60;
+    const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
+    const dist = 50 + Math.random() * 50;
+
     particleLayer.append('circle')
       .attr('cx', baseX).attr('cy', baseY)
-      .attr('r', 1 + Math.random() * 2.5)
+      .attr('r', 1.5 + Math.random() * 2)
       .attr('fill', color)
       .attr('filter', 'url(#glow)')
-      .attr('opacity', 1)
-      .transition().duration(600 + Math.random() * 400)
+      .attr('opacity', 0.9)
+      .transition().duration(700 + Math.random() * 500)
       .ease(d3.easeCubicOut)
       .attr('cx', baseX + Math.cos(angle) * dist)
       .attr('cy', baseY + Math.sin(angle) * dist)
@@ -463,38 +605,151 @@ function spawnParticles(d, count) {
   }
 }
 
+// === ВОЛНА ===
 function animateAncestorWave(node) {
   const ancestors = node.ancestors().reverse();
-  nodeLayer.selectAll('.card-bg').classed('highlighted', false);
 
-  ancestors.forEach((anc, i) => {
+  nodeLayer.selectAll('.card-bg')
+    .classed('highlighted', false)
+    .classed('root-highlighted', false);
+
+  ancestors.forEach((ancestor, i) => {
     setTimeout(() => {
-      nodeLayer.selectAll('.node').filter(d => d.data.id === anc.data.id)
+      const isRoot = ancestor.data.id === root.data.id;
+
+      nodeLayer.selectAll('.node')
+        .filter(d => d.data.id === ancestor.data.id)
         .select('.card-bg')
-        .style('filter', 'drop-shadow(0 0 18px rgba(0, 243, 255, 0.95))');
-      spawnParticles(anc, CONFIG.particles.onWave);
+        .classed('highlighted', !isRoot)
+        .classed('root-highlighted', isRoot)
+        .style('filter', 'drop-shadow(0 0 14px rgba(74,158,255,0.9))');
+
+      spawnParticles(ancestor, CONFIG.particles.onWave);
+
       setTimeout(() => {
-        nodeLayer.selectAll('.node').filter(d => d.data.id === anc.data.id)
-          .select('.card-bg').style('filter', 'url(#glow)');
-      }, CONFIG.wave.duration);
+        nodeLayer.selectAll('.node')
+          .filter(d => d.data.id === ancestor.data.id)
+          .select('.card-bg')
+          .style('filter', null);
+      }, CONFIG.wave.duration + 200);
     }, i * CONFIG.wave.stepDelay);
   });
+
+  const ancestorIds = new Set(ancestors.map(a => a.data.id));
+  linkLayer.selectAll('.link')
+    .classed('highlighted', d => ancestorIds.has(d.target.data.id))
+    .classed('dimmed', d => !ancestorIds.has(d.target.data.id));
 }
 
-// === ДЫХАНИЕ СЕТИ ===
+// === СБРОС ===
+function resetHighlight() {
+  nodeLayer.selectAll('.card-bg')
+    .classed('highlighted', false)
+    .classed('root-highlighted', false)
+    .attr('opacity', 1)
+    .style('filter', null);
+
+  linkLayer.selectAll('.link')
+    .classed('highlighted', false)
+    .classed('dimmed', false)
+    .attr('stroke', d => {
+      const { opacity } = getGenerationStyle(d.target.depth);
+      return `rgba(74, 158, 255, ${opacity * 0.5})`;
+    });
+}
+
+// === ПЕРВИЧНЫЙ РЕНДЕР ===
+renderTree(true);
+
+// === КЛИК ПО ФОНУ ===
+svg.on('click', () => {
+  svg.transition().duration(CONFIG.duration.zoom)
+    .call(zoom.transform, d3.zoomIdentity);
+  resetHighlight();
+  tooltip.style('opacity', 0);
+});
+
+// === КНОПКИ ===
+document.getElementById('btn-reset').addEventListener('click', (e) => {
+  e.stopPropagation();
+  svg.transition().duration(CONFIG.duration.zoom)
+    .call(zoom.transform, d3.zoomIdentity);
+  resetHighlight();
+});
+
+document.getElementById('btn-zoom-in').addEventListener('click', (e) => {
+  e.stopPropagation();
+  svg.transition().duration(300).call(zoom.scaleBy, 1.4);
+});
+
+document.getElementById('btn-zoom-out').addEventListener('click', (e) => {
+  e.stopPropagation();
+  svg.transition().duration(300).call(zoom.scaleBy, 0.7);
+});
+
+document.getElementById('btn-toggle-lines').addEventListener('click', function(e) {
+  e.stopPropagation();
+  const hidden = linkLayer.style('display') === 'none';
+  linkLayer.style('display', hidden ? 'block' : 'none');
+  pulseLayer.style('display', hidden ? 'block' : 'none');
+  this.classList.toggle('active', hidden);
+});
+
+// === АДАПТИВНОСТЬ ===
+let resizeTimeout;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => location.reload(), 300);
+});
+
+// === КЛАВИАТУРА ===
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    svg.transition().duration(CONFIG.duration.zoom)
+      .call(zoom.transform, d3.zoomIdentity);
+    resetHighlight();
+    tooltip.style('opacity', 0);
+  }
+  if (e.key === '+' || e.key === '=') {
+    svg.transition().duration(300).call(zoom.scaleBy, 1.3);
+  }
+  if (e.key === '-') {
+    svg.transition().duration(300).call(zoom.scaleBy, 0.7);
+  }
+});
+
+// === ДЫХАНИЕ ===
 if (CONFIG.breathing.enabled) {
   const startTime = Date.now();
-  let active = true;
-  svg.on('mousedown', () => active = false).on('mouseup', () => active = true);
+  let zoomActive = false;
+  let entranceDone = false;
+
+  svg.on('mousedown.breathing', () => { zoomActive = true; });
+  svg.on('mouseup.breathing',   () => { zoomActive = false; });
+  svg.on('mouseleave.breathing',() => { zoomActive = false; });
+  svg.on('touchend.breathing',  () => { zoomActive = false; });
+
+  setTimeout(() => { entranceDone = true; }, CONFIG.duration.entrance + 200);
 
   function breathe() {
-    if (active) {
+    if (entranceDone && !zoomActive) {
       const now = Date.now();
+
       nodeLayer.selectAll('.node').attr('transform', function(d) {
         const amp = CONFIG.breathing.baseAmp + d.depth * CONFIG.breathing.ampPerDepth;
-        const dur = CONFIG.breathing.minDuration + (hashNoise(d.data.id, 7) + 1) * 1500;
-        const t = (now - startTime) / dur + hashNoise(d.data.id, 9) * Math.PI;
-        return nodeTransform(d, Math.sin(t) * Math.min(amp, 3.5), Math.cos(t * 0.7) * Math.min(amp, 3.5));
+        const finalAmp = d.data.isGenerated ? amp * 0.6 : amp;
+
+        const dur = CONFIG.breathing.minDuration +
+                    (hashNoise(d.data.id, 7) + 1) / 2 *
+                    (CONFIG.breathing.maxDuration - CONFIG.breathing.minDuration);
+
+        const phase = (hashNoise(d.data.id, 9) + 1) * Math.PI;
+        const t = (now - startTime) / dur + phase;
+
+        const dx = Math.sin(t) * finalAmp;
+        const dy = Math.cos(t * 0.7) * finalAmp * 0.6;
+
+        return nodeTransform(d, dx, dy);
       });
     }
     requestAnimationFrame(breathe);
@@ -502,9 +757,12 @@ if (CONFIG.breathing.enabled) {
   breathe();
 }
 
-// Сброс и кнопки
-document.getElementById('btn-reset')?.addEventListener('click', () => {
-  svg.transition().duration(700).call(zoom.transform, d3.zoomIdentity);
-});
-
-renderTree(true);
+// === ИНДИКАТОР ГЛУБИНЫ ===
+const footer = document.getElementById('footer');
+if (footer && !document.getElementById('infinite-status')) {
+  const status = document.createElement('span');
+  status.id = 'infinite-status';
+  status.style.cssText = 'margin-left: 16px; color: #a06bff; transition: opacity 0.5s; opacity: 0.4;';
+  status.textContent = `🌌 Глубина рода: ${root.descendants().reduce((max, d) => Math.max(max, d.depth), 0) + 1} поколений`;
+  footer.appendChild(status);
+}
