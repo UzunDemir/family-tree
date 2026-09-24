@@ -1,5 +1,6 @@
 /**
  * Семейное древо Узун — D3.js + бесконечные корни
+ * Адаптив: монитор / планшет / телефон
  * 
  * Правила:
  *   - ЛЮБОЙ узел ВСЕГДА ниже родителя
@@ -7,14 +8,28 @@
  *   - Jitter: по X НЕТ, по Y только вниз
  *   - Карточки НЕ наезжают друг на друга
  *   - Яркие пульсы для реальных, тусклые для сгенерированных
- *   - Кнопка «Сброс рода» — медленное исчезновение бесконечных предков
+ *   - Кнопка «Сброс рода» — медленное исчезновение
+ *   - Адаптивные размеры под устройство
  */
+
+// ============================================
+// === ОПРЕДЕЛЯЕМ УСТРОЙСТВО ===
+// ============================================
+const IS_MOBILE = window.innerWidth < 768;
+const IS_SMALL_MOBILE = window.innerWidth < 400;
+
+const CARD_W = IS_SMALL_MOBILE ? 100 : (IS_MOBILE ? 120 : 140);
+const CARD_H = IS_SMALL_MOBILE ? 42 : (IS_MOBILE ? 48 : 56);
+const AVATAR_R = IS_SMALL_MOBILE ? 12 : (IS_MOBILE ? 15 : 18);
+const FONT_NAME = IS_SMALL_MOBILE ? '9px' : (IS_MOBILE ? '10px' : '12px');
+const FONT_DATE = IS_SMALL_MOBILE ? '7px' : (IS_MOBILE ? '8px' : '10px');
+const FONT_AVATAR = IS_SMALL_MOBILE ? '10px' : (IS_MOBILE ? '11px' : '13px');
 
 // === КОНФИГУРАЦИЯ ===
 const CONFIG = {
-  cardWidth: 140,
-  cardHeight: 56,
-  avatarRadius: 18,
+  cardWidth: CARD_W,
+  cardHeight: CARD_H,
+  avatarRadius: AVATAR_R,
   maxGeneration: 3,
 
   infinity: {
@@ -27,15 +42,21 @@ const CONFIG = {
   duration: { zoom: 750, highlight: 300, entrance: 600 },
 
   breathing: {
-    enabled: true,
+    enabled: !IS_MOBILE,
     baseAmp: 4,
     ampPerDepth: 3,
     minDuration: 4000,
     maxDuration: 7000
   },
 
-  pulse: { enabled: true, speed: 4000, radius: 3, glow: true },
-  particles: { enabled: true, onHover: 8, onWave: 6 },
+  pulse: { enabled: true, speed: 4000, radius: IS_MOBILE ? 2.5 : 3, glow: true },
+
+  particles: {
+    enabled: !IS_MOBILE,
+    onHover: IS_MOBILE ? 4 : 8,
+    onWave: IS_MOBILE ? 3 : 6
+  },
+
   wave: { stepDelay: 180, duration: 400 },
 
   infiniteRoots: {
@@ -73,7 +94,7 @@ const nodeLayer     = g.append('g').attr('class', 'nodes-layer');
 const particleLayer = g.append('g').attr('class', 'particle-layer');
 
 const offsetX = width / 2;
-const offsetY = height * 0.1;
+const offsetY = IS_MOBILE ? height * 0.06 : height * 0.1;
 
 // === ЗУМ ===
 const zoom = d3.zoom()
@@ -87,11 +108,22 @@ const zoom = d3.zoom()
 
 svg.call(zoom);
 
+// === НАЧАЛЬНЫЙ ЗУМ ===
+// На мобильном — чуть отдаляем, чтобы дерево влезло
+const initialScale = IS_MOBILE ? 0.7 : 1;
+const initialTX = IS_MOBILE ? width * 0.15 : 0;
+const initialTY = IS_MOBILE ? height * 0.05 : 0;
+
+svg.call(zoom.transform, d3.zoomIdentity
+  .translate(initialTX, initialTY)
+  .scale(initialScale)
+);
+
 // === ПОСТРОЕНИЕ ===
 let root = d3.hierarchy(buildHierarchy(familyData));
 
-const CARD_MIN_DX = CONFIG.cardWidth + 40;
-const CARD_MIN_DY = CONFIG.cardHeight + 30;
+const CARD_MIN_DX = CONFIG.cardWidth + (IS_MOBILE ? 20 : 40);
+const CARD_MIN_DY = CONFIG.cardHeight + (IS_MOBILE ? 20 : 30);
 
 const treeLayout = d3.tree()
   .size([width * 0.95, height * 0.7])
@@ -115,13 +147,13 @@ function hashNoise(id, seed = 0) {
 
 // === JITTER ===
 const JITTER = {
-  yByDepth:      [20, 30, 45, 60],
-  rotateByDepth: [0, 1, 2, 3]
+  yByDepth:      IS_MOBILE ? [10, 15, 20, 25] : [20, 30, 45, 60],
+  rotateByDepth: IS_MOBILE ? [0, 0.5, 1, 1.5] : [0, 1, 2, 3]
 };
 
-const GENERATION_STEP_Y = 90;
-const GENERATION_STEP_Y_MIN = 80;
-const PARENT_SIDE_OFFSET = 35;
+const GENERATION_STEP_Y = IS_MOBILE ? 70 : 90;
+const GENERATION_STEP_Y_MIN = IS_MOBILE ? 60 : 80;
+const PARENT_SIDE_OFFSET = IS_MOBILE ? 25 : 35;
 
 function enforceNoOverlapX(root) {
   const allNodes = root.descendants();
@@ -189,11 +221,15 @@ function adjustAllPositions(root) {
       ? -PARENT_SIDE_OFFSET
       : PARENT_SIDE_OFFSET;
 
-    const yJitter = Math.abs(hashNoise(node.data.id, 12)) * 20;
+    const yJitter = Math.abs(hashNoise(node.data.id, 12)) * (IS_MOBILE ? 12 : 20);
+
+    // Адаптивный шаг — чем глубже, тем компактнее
+    const depthFactor = Math.max(0.4, 1 - node.depth * 0.08);
+    const step = GENERATION_STEP_Y * depthFactor;
 
     node.x = parent.x + baseSideOffset;
-    node.y = parent.y + GENERATION_STEP_Y + yJitter;
-    node.rotation = hashNoise(node.data.id, 13) * 3;
+    node.y = parent.y + step + yJitter;
+    node.rotation = hashNoise(node.data.id, 13) * (IS_MOBILE ? 1.5 : 3);
   });
 
   enforceNoOverlapX(root);
@@ -202,7 +238,7 @@ function adjustAllPositions(root) {
     .sort((a, b) => a.depth - b.depth)
     .forEach(node => {
       if (node.parent) {
-        const minY = node.parent.y + GENERATION_STEP_Y_MIN;
+        const minY = node.parent.y + GENERATION_STEP_Y_MIN * 0.7;
         if (node.y < minY) node.y = minY;
       }
     });
@@ -249,6 +285,35 @@ function getInitials(name) {
   const parts = name.split(' ').filter(Boolean);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return parts[0] ? parts[0][0].toUpperCase() : '?';
+}
+
+// === МОБИЛЬНЫЙ ТУЛТИП ===
+function showMobileTooltip(d, event) {
+  const genLabel = d.depth === 0 ? 'Младшее поколение' : `${d.depth}-е поколение от младшего`;
+  const genderLabel = d.data.gender === 'male' ? 'Мужской' : 'Женский';
+  const generatedLabel = d.data.isGenerated
+    ? '<div class="row" style="color:#a06bff">✨ Восстановлено по роду</div>'
+    : '';
+
+  const displayName = d.data.name
+    || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
+
+  tooltip
+    .style('opacity', 1)
+    .html(`
+      <strong>${displayName}</strong>
+      <div class="row">Дата рождения: <span>${d.data.birth || 'неизвестна'}</span></div>
+      <div class="row">Поколение: <span>${genLabel}</span></div>
+      <div class="row">Пол: <span>${genderLabel}</span></div>
+      ${generatedLabel}
+    `)
+    .style('left', Math.min(event.pageX + 15, window.innerWidth - 260) + 'px')
+    .style('top', Math.max(event.pageY - 120, 60) + 'px');
+
+  clearTimeout(window._mobileTooltipTimer);
+  window._mobileTooltipTimer = setTimeout(() => {
+    tooltip.style('opacity', 0);
+  }, 2500);
 }
 
 // ============================================
@@ -473,12 +538,14 @@ function renderTree(animateEntrance = false) {
     .attr('class', 'avatar-text')
     .attr('x', avatarX)
     .attr('y', 0)
+    .style('font-size', FONT_AVATAR)
     .text(d => getInitials(d.data.name));
 
   nodesEnter.append('text')
     .attr('class', 'card-name')
     .attr('x', avatarX + 26)
     .attr('y', -6)
+    .style('font-size', FONT_NAME)
     .text(d => {
       if (!d.data.name) return '';
       const parts = d.data.name.split(' ');
@@ -489,6 +556,7 @@ function renderTree(animateEntrance = false) {
     .attr('class', 'card-date')
     .attr('x', avatarX + 26)
     .attr('y', 10)
+    .style('font-size', FONT_DATE)
     .text(d => d.data.birth || '—');
 
   attachNodeHandlers(nodesEnter);
@@ -583,14 +651,52 @@ if (CONFIG.pulse.enabled) {
 
 // === ОБРАБОТЧИКИ ===
 function attachNodeHandlers(selection) {
-  selection.on('mouseenter', (event, d) => {
-    spawnParticles(d, CONFIG.particles.onHover);
-  });
+  // Hover — только на десктопе
+  if (!IS_MOBILE) {
+    selection.on('mouseenter', (event, d) => {
+      spawnParticles(d, CONFIG.particles.onHover);
+    });
 
+    selection.on('mouseover', (event, d) => {
+      const genLabel = d.depth === 0 ? 'Младшее поколение' : `${d.depth}-е поколение от младшего`;
+      const genderLabel = d.data.gender === 'male' ? 'Мужской' : 'Женский';
+      const generatedLabel = d.data.isGenerated
+        ? '<div class="row" style="color:#a06bff">✨ Восстановлено по роду</div>'
+        : '';
+
+      const displayName = d.data.name
+        || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
+
+      tooltip
+        .style('opacity', 1)
+        .html(`
+          <strong>${displayName}</strong>
+          <div class="row">Дата рождения: <span>${d.data.birth || 'неизвестна'}</span></div>
+          <div class="row">Поколение: <span>${genLabel}</span></div>
+          <div class="row">Пол: <span>${genderLabel}</span></div>
+          ${d.children ? `<div class="row">Предков выше: <span>${d.children.length}</span></div>` : ''}
+          ${generatedLabel}
+        `)
+        .style('left', (event.pageX + 15) + 'px')
+        .style('top', (event.pageY - 15) + 'px');
+    });
+
+    selection.on('mousemove', (event) => {
+      tooltip
+        .style('left', (event.pageX + 15) + 'px')
+        .style('top', (event.pageY - 15) + 'px');
+    });
+
+    selection.on('mouseout', () => {
+      tooltip.style('opacity', 0);
+    });
+  }
+
+  // Click — на всех устройствах
   selection.on('click', (event, d) => {
     event.stopPropagation();
 
-    const scale = 1.6;
+    const scale = IS_MOBILE ? 1.3 : 1.6;
     const x = width / 2 - (d.x + offsetX) * scale;
     const y = height / 2 - (d.y + offsetY) * scale;
 
@@ -600,43 +706,14 @@ function attachNodeHandlers(selection) {
 
     animateAncestorWave(d);
 
+    // На мобильном — показываем тултип
+    if (IS_MOBILE) {
+      showMobileTooltip(d, event);
+    }
+
     if (CONFIG.infiniteRoots.enabled && !d._childrenLoaded) {
       setTimeout(() => manualLoad(d), 400);
     }
-  });
-
-  selection.on('mouseover', (event, d) => {
-    const genLabel = d.depth === 0 ? 'Младшее поколение' : `${d.depth}-е поколение от младшего`;
-    const genderLabel = d.data.gender === 'male' ? 'Мужской' : 'Женский';
-    const generatedLabel = d.data.isGenerated
-      ? '<div class="row" style="color:#a06bff">✨ Восстановлено по роду</div>'
-      : '';
-
-    const displayName = d.data.name
-      || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
-
-    tooltip
-      .style('opacity', 1)
-      .html(`
-        <strong>${displayName}</strong>
-        <div class="row">Дата рождения: <span>${d.data.birth || 'неизвестна'}</span></div>
-        <div class="row">Поколение: <span>${genLabel}</span></div>
-        <div class="row">Пол: <span>${genderLabel}</span></div>
-        ${d.children ? `<div class="row">Предков выше: <span>${d.children.length}</span></div>` : ''}
-        ${generatedLabel}
-      `)
-      .style('left', (event.pageX + 15) + 'px')
-      .style('top', (event.pageY - 15) + 'px');
-  });
-
-  selection.on('mousemove', (event) => {
-    tooltip
-      .style('left', (event.pageX + 15) + 'px')
-      .style('top', (event.pageY - 15) + 'px');
-  });
-
-  selection.on('mouseout', () => {
-    tooltip.style('opacity', 0);
   });
 }
 
@@ -734,7 +811,6 @@ function clearGeneratedAncestors() {
 
   console.log(`🗑️ Найдено ${generatedNodes.size()} сгенерированных узлов`);
 
-  // === ФАЗА 1: плавное исчезновение ===
   generatedNodes
     .transition()
     .duration(1800)
@@ -760,18 +836,15 @@ function clearGeneratedAncestors() {
     .ease(d3.easeCubicOut)
     .attr('opacity', 0);
 
-  // === ФАЗА 2: чистка familyData + пересборка ===
   setTimeout(() => {
     console.log('🧹 Чищу familyData от сгенерированных...');
 
-    // Рекурсивная очистка каждого узла
     function deepClean(node) {
       if (!node || !node.children || node.children.length === 0) return;
       node.children = node.children.filter(c => !c.isGenerated);
       node.children.forEach(deepClean);
     }
 
-    // Очищаем ВСЕ узлы во всех массивах
     function walkAll(node) {
       if (!node) return;
       deepClean(node);
@@ -780,33 +853,27 @@ function clearGeneratedAncestors() {
       }
     }
 
-    // Проходим по всем верхним массивам + сам familyData
     walkAll(familyData);
     (familyData.parents || []).forEach(walkAll);
     (familyData.grandparents || []).forEach(walkAll);
     (familyData.greatGrandparents || []).forEach(walkAll);
 
-    // Проверка в консоли
     let remaining = 0;
     root.descendants().forEach(d => { if (d.data.isGenerated) remaining++; });
     console.log(`🔍 Осталось сгенерированных в D3 до пересборки: ${remaining}`);
 
-    // === ЖЁСТКАЯ ПЕРЕСБОРКА ===
     console.log('🔄 Пересобираю дерево...');
 
-    // Полностью удаляем все DOM-элементы
     nodeLayer.selectAll('.node').remove();
     linkLayer.selectAll('.link').remove();
     pulseLayer.selectAll('.pulse').remove();
 
-    // Пересобираем данные
     const newHierarchyData = buildHierarchy(familyData);
     const newRoot = d3.hierarchy(newHierarchyData);
     treeLayout(newRoot);
     adjustAllPositions(newRoot);
     root = newRoot;
 
-    // Строим заново
     renderTree(true);
 
     console.log('✅ Сброс завершён. Глубина:', 
@@ -881,7 +948,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// === ДЫХАНИЕ ===
+// === ДЫХАНИЕ (только на десктопе) ===
 if (CONFIG.breathing.enabled) {
   const startTime = Date.now();
   let zoomActive = false;
