@@ -3,7 +3,6 @@
  * Основано на tree.xlsx
  */
 
-// ВАЖНО: let, а не const — чтобы можно было мутировать
 let familyData = {
   id: "demir",
   name: "Узун Демир",
@@ -38,7 +37,7 @@ let familyData = {
 
 /**
  * Строит иерархию для D3 из familyData
- * Рекурсивно обходит все узлы, включая сгенерированных предков
+ * Рекурсивно подтягивает сгенерированных предков
  */
 function buildHierarchy(data) {
   function makeNode(id, name, birth, gender, generation, isInfinite = false, isGenerated = false) {
@@ -47,6 +46,31 @@ function buildHierarchy(data) {
       isInfinite, isGenerated,
       children: []
     };
+  }
+
+  function findNodeById(node, id) {
+    if (node.id === id) return node;
+    for (const child of node.children) {
+      const found = findNodeById(child, id);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  // Копирует сгенерированных детей из источника
+  function copyGenerated(targetNode, sourceNode) {
+    if (!sourceNode.children || sourceNode.children.length === 0) return;
+    targetNode.children = targetNode.children || [];
+    sourceNode.children.forEach(srcChild => {
+      const newNode = makeNode(
+        srcChild.id, srcChild.name, srcChild.birth,
+        srcChild.gender, srcChild.generation,
+        false, true  // isGenerated = true
+      );
+      targetNode.children.push(newNode);
+      // Рекурсивно
+      copyGenerated(newNode, srcChild);
+    });
   }
 
   const root = makeNode(data.id, data.name, data.birth, data.gender, data.generation);
@@ -75,32 +99,13 @@ function buildHierarchy(data) {
     if (target) target.children.push(node);
   });
 
-  // ВАЖНО: переносим сгенерированных детей, если они уже есть
-  // Они хранятся в familyData.greatGrandparents[i].children
-  function attachGenerated(node, sourceArray) {
-    if (!sourceArray) return;
-    sourceArray.forEach(src => {
-      const target = findNodeById(node, src.id);
-      if (target && src.children && src.children.length > 0) {
-        target.children = src.children.map(c => 
-          makeNode(c.id, c.name, c.birth, c.gender, c.generation, false, true)
-        );
-        // Рекурсивно для следующих поколений
-        src.children.forEach(c => attachGenerated(target, [c]));
-      }
-    });
-  }
-
-  function findNodeById(node, id) {
-    if (node.id === id) return node;
-    for (const child of node.children) {
-      const found = findNodeById(child, id);
-      if (found) return found;
+  // Применяем сгенерированных детей из greatGrandparents
+  (data.greatGrandparents || []).forEach(ggp => {
+    const target = findNodeById(root, ggp.id);
+    if (target) {
+      copyGenerated(target, ggp);
     }
-    return null;
-  }
-
-  attachGenerated(root, data.greatGrandparents);
+  });
 
   return root;
 }
