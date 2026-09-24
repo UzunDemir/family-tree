@@ -1,0 +1,232 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: radial-gradient(ellipse at center, #12122a 0%, #05050f 100%);
+  color: #e0e0ff;
+}
+
+/* === ЗАГОЛОВОК === */
+#header {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: 20px 30px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+#header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  background: linear-gradient(90deg, #4a9eff, #a06bff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+#header .subtitle {
+  font-size: 12px;
+  color: #6b6b8a;
+  margin-top: 4px;
+}
+
+/* === КОНТЕЙНЕР ДЕРЕВА === */
+#tree-container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+#tree-container svg {
+  display: block;
+  cursor: grab;
+}
+
+#tree-container svg:active {
+  cursor: grabbing;
+}
+
+/* === УЗЛЫ === */
+.node {
+  cursor: pointer;
+  transition: filter 0.2s;
+}
+
+.node:hover {
+  filter: drop-shadow(0 0 8px rgba(74, 158, 255, 0.6));
+}
+
+.card-bg {
+  fill: #1a1a2e;
+  stroke: #2a2a4a;
+  stroke-width: 1;
+  transition: stroke 0.3s, stroke-width 0.3s, fill 0.3s;
+}
+
+.node:hover .card-bg {
+  stroke: #4a9eff;
+  stroke-width: 2;
+  fill: #1e1e3a;
+}
+
+.card-bg.highlighted {
+  stroke: #4a9eff !important;
+  stroke-width: 2.5 !important;
+  fill: #1e1e3a !important;
+}
+
+.card-bg.root-highlighted {
+  stroke: #a06bff !important;
+  stroke-width: 3 !important;
+}
+
+.card-name {
+  fill: #e0e0ff;
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.card-date {
+  fill: #6b6b8a;
+  font-size: 10px;
+  pointer-events: none;
+}
+
+.avatar-circle {
+  fill: #2a2a4a;
+  stroke: #3a3a5a;
+  stroke-width: 1;
+}
+
+.avatar-text {
+  fill: #a0a0c0;
+  font-size: 13px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+/* Мужские и женские аватары */
+.avatar-circle.male { fill: #1e3a5f; stroke: #4a9eff; }
+.avatar-circle.female { fill: #4a1e3f; stroke: #ff6bb0; }
+.avatar-circle.male + .avatar-text { fill: #8ac4ff; }
+.avatar-circle.female + .avatar-text { fill: #ffa0d0; }
+
+/* === СВЯЗИ === */
+.link {
+  fill: none;
+  stroke: #2a2a4a;
+  stroke-width: 1.5;
+  transition: stroke 0.3s, stroke-width 0.3s;
+}
+
+.link.highlighted {
+  stroke: #4a9eff !important;
+  stroke-width: 2.5 !important;
+}
+
+.link.dimmed {
+  stroke: rgba(42, 42, 74, 0.15) !important;
+}
+
+/* === ТУЛТИП === */
+.tooltip {
+  position: absolute;
+  background: rgba(26, 26, 46, 0.98);
+  border: 1px solid #4a9eff;
+  border-radius: 10px;
+  padding: 14px 18px;
+  color: #e0e0ff;
+  font-size: 13px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  box-shadow: 0 8px 32px rgba(74, 158, 255, 0.3);
+  z-index: 100;
+  max-width: 260px;
+}
+
+.tooltip strong {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 6px;
+  color: #4a9eff;
+}
+
+.tooltip .row {
+  color: #a0a0c0;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.tooltip .row span { color: #e0e0ff; }
+
+/* === КНОПКИ УПРАВЛЕНИЯ === */
+#controls {
+  position: absolute;
+  right: 24px;
+  bottom: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 10;
+}
+
+#controls button {
+  background: rgba(26, 26, 46, 0.9);
+  border: 1px solid #2a2a4a;
+  color: #a0a0c0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  backdrop-filter: blur(10px);
+  min-width: 44px;
+}
+
+#controls button:hover {
+  border-color: #4a9eff;
+  color: #4a9eff;
+  transform: translateY(-2px);
+}
+
+#controls button.active {
+  border-color: #4a9eff;
+  color: #4a9eff;
+  background: rgba(74, 158, 255, 0.15);
+}
+
+/* === ФУТЕР === */
+#footer {
+  position: absolute;
+  bottom: 20px;
+  left: 30px;
+  font-size: 12px;
+  color: #4a4a6a;
+  z-index: 10;
+}
+
+/* === АНИМАЦИЯ ПОЯВЛЕНИЯ === */
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.5); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.node {
+  animation: fadeInScale 0.6s ease-out backwards;
+}
+
+/* === АДАПТИВ === */
+@media (max-width: 768px) {
+  #header h1 { font-size: 16px; }
+  #header .subtitle { display: none; }
+  #controls { right: 12px; bottom: 60px; }
+  #controls button { padding: 8px 10px; font-size: 12px; }
+}
