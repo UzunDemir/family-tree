@@ -9,7 +9,6 @@ html, body {
   color: #e0e0ff;
 }
 
-/* === ЗАГОЛОВОК === */
 #header {
   position: absolute;
   top: 0; left: 0; right: 0;
@@ -34,7 +33,6 @@ html, body {
   margin-top: 4px;
 }
 
-/* === КОНТЕЙНЕР ДЕРЕВА === */
 #tree-container {
   width: 100vw;
   height: 100vh;
@@ -50,12 +48,7 @@ html, body {
   cursor: grabbing;
 }
 
-/* === УЗЛЫ === */
-.node {
-  cursor: pointer;
-  /* ВАЖНО: никаких animation и transform здесь —
-     D3 управляет transform, CSS не должен вмешиваться */
-}
+.node { cursor: pointer; }
 
 .card-bg {
   fill: #1a1a2e;
@@ -75,13 +68,11 @@ html, body {
   stroke: #4a9eff !important;
   stroke-width: 2.5 !important;
   fill: #1e1e3a !important;
-  filter: drop-shadow(0 0 10px rgba(74, 158, 255, 0.7));
 }
 
 .card-bg.root-highlighted {
   stroke: #a06bff !important;
   stroke-width: 3 !important;
-  filter: drop-shadow(0 0 12px rgba(160, 107, 255, 0.8));
 }
 
 .card-name {
@@ -112,13 +103,11 @@ html, body {
   pointer-events: none;
 }
 
-/* Мужские и женские аватары */
 .avatar-circle.male { fill: #1e3a5f; stroke: #4a9eff; }
 .avatar-circle.female { fill: #4a1e3f; stroke: #ff6bb0; }
 .avatar-circle.male + .avatar-text { fill: #8ac4ff; }
 .avatar-circle.female + .avatar-text { fill: #ffa0d0; }
 
-/* === СВЯЗИ === */
 .link {
   fill: none;
   stroke: #2a2a4a;
@@ -129,14 +118,12 @@ html, body {
 .link.highlighted {
   stroke: #4a9eff !important;
   stroke-width: 2.5 !important;
-  filter: drop-shadow(0 0 6px rgba(74, 158, 255, 0.6));
 }
 
 .link.dimmed {
   stroke: rgba(42, 42, 74, 0.15) !important;
 }
 
-/* === ТУЛТИП === */
 .tooltip {
   position: absolute;
   background: rgba(26, 26, 46, 0.98);
@@ -168,7 +155,6 @@ html, body {
 
 .tooltip .row span { color: #e0e0ff; }
 
-/* === КНОПКИ УПРАВЛЕНИЯ === */
 #controls {
   position: absolute;
   right: 24px;
@@ -204,7 +190,6 @@ html, body {
   background: rgba(74, 158, 255, 0.15);
 }
 
-/* === ФУТЕР === */
 #footer {
   position: absolute;
   bottom: 20px;
@@ -214,19 +199,15 @@ html, body {
   z-index: 10;
 }
 
-/* === ПУЛЬСЫ И ЧАСТИЦЫ === */
-/* Не перехватывают клики и наведение */
 .pulse-layer circle,
 .particle-layer circle {
   pointer-events: none;
 }
 
-/* Свечение для пульсов */
 .pulse-layer circle {
   mix-blend-mode: screen;
 }
 
-/* === АДАПТИВ === */
 @media (max-width: 768px) {
   #header h1 { font-size: 16px; }
   #header .subtitle { display: none; }
