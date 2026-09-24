@@ -1,9 +1,11 @@
 /**
  * Семейное древо Узун — D3.js + бесконечные корни
+ * 
  * Правила:
- *   - Любой узел (реальный или сгенерированный) ВСЕГДА ниже родителя
+ *   - ЛЮБОЙ узел (реальный или сгенерированный) ВСЕГДА ниже родителя
  *   - Сгенерированные узлы БЕЗ имён (только пол и дата)
- *   - Jitter только по X и вниз по Y
+ *   - Jitter: по X свободно, по Y только вниз, наклон свободно
+ *   - Дыхание: по Y только вниз (не поднимает узел выше родителя)
  */
 
 // === КОНФИГУРАЦИЯ ===
@@ -99,13 +101,13 @@ function hashNoise(id, seed = 0) {
   for (let i = 0; i < id.length; i++) {
     h = (h * 31 + id.charCodeAt(i)) | 0;
   }
-  return ((h % 1000) / 1000) * 2 - 1;  // диапазон [-1, 1]
+  return ((h % 1000) / 1000) * 2 - 1;  // [-1, 1]
 }
 
 // === НЕРОВНОЕ РАСПОЛОЖЕНИЕ ===
 const JITTER = {
   xByDepth:      [20, 35, 55, 80],
-  yByDepth:      [10, 20, 35, 55],
+  yByDepth:      [15, 25, 40, 55],   // разброс вниз
   rotateByDepth: [0, 1.5, 3, 5]
 };
 
@@ -118,7 +120,7 @@ const PARENT_SIDE_OFFSET = 35;
 
 function adjustAllPositions(root) {
   // === 1. РЕАЛЬНЫЕ ПРЕДКИ ===
-  // Всегда ниже родителя, но с jitter по X и наклоном
+  // Обходим от корня к листьям, чтобы parent.y уже был финальным
   const realNodes = root.descendants()
     .filter(d => !d.data.isGenerated)
     .sort((a, b) => a.depth - b.depth);
@@ -126,22 +128,26 @@ function adjustAllPositions(root) {
   realNodes.forEach(node => {
     const depth = Math.min(node.depth, JITTER.xByDepth.length - 1);
 
+    // Jitter по X — свободный
     node.x += hashNoise(node.data.id, 1) * JITTER.xByDepth[depth];
-    node.y += hashNoise(node.data.id, 2) * JITTER.yByDepth[depth];
+
+    // Наклон — свободный
     node.rotation = hashNoise(node.data.id, 3) * JITTER.rotateByDepth[depth];
+
+    // Jitter по Y — ТОЛЬКО ВНИЗ
+    const yJitter = Math.abs(hashNoise(node.data.id, 2)) * JITTER.yByDepth[depth];
+    node.y += yJitter;
 
     // ГЛАВНОЕ ПРАВИЛО: ребёнок ВСЕГДА ниже родителя
     if (node.parent) {
       const minY = node.parent.y + GENERATION_STEP_Y_MIN;
       if (node.y < minY) {
-        // Подтягиваем вниз + небольшой случайный разброс ТОЛЬКО вниз
-        node.y = minY + Math.abs(hashNoise(node.data.id, 4)) * 15;
+        node.y = minY;
       }
     }
   });
 
   // === 2. СГЕНЕРИРОВАННЫЕ ===
-  // Всегда ниже родителя, jitter только вниз и в стороны
   const generated = root.descendants()
     .filter(d => d.data.isGenerated)
     .sort((a, b) => a.depth - b.depth);
@@ -155,10 +161,8 @@ function adjustAllPositions(root) {
       : PARENT_SIDE_OFFSET;
 
     const sideJitter = hashNoise(node.data.id, 11) * 25;
-    // ТОЛЬКО ВНИЗ — модуль числа
     const yJitter = Math.abs(hashNoise(node.data.id, 12)) * 20;
 
-    // ГЛАВНОЕ ПРАВИЛО
     node.x = parent.x + baseSideOffset + sideJitter;
     node.y = parent.y + GENERATION_STEP_Y + yJitter;
     node.rotation = hashNoise(node.data.id, 13) * 4;
@@ -755,9 +759,9 @@ if (CONFIG.breathing.enabled) {
         const phase = (hashNoise(d.data.id, 9) + 1) * Math.PI;
         const t = (now - startTime) / dur + phase;
 
+        // X колеблется в обе стороны — свободно
         const dx = Math.sin(t) * finalAmp;
-        // ВАЖНО: дыхание вниз тоже только положительное,
-        // чтобы не поднять узел выше родителя
+        // Y колеблется ТОЛЬКО ВНИЗ — не поднимаем узел выше родителя
         const dy = Math.abs(Math.cos(t * 0.7)) * finalAmp * 0.3;
 
         return nodeTransform(d, dx, dy);
