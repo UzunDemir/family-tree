@@ -1,8 +1,3 @@
-/**
- * Данные семейного древа Узун
- * Основано на tree.xlsx
- */
-
 let familyData = {
   id: "demir",
   name: "Узун Демир",
@@ -35,17 +30,9 @@ let familyData = {
   ]
 };
 
-/**
- * Строит иерархию для D3 из familyData
- * Рекурсивно подтягивает сгенерированных предков
- */
 function buildHierarchy(data) {
   function makeNode(id, name, birth, gender, generation, isInfinite = false, isGenerated = false) {
-    return {
-      id, name, birth, gender, generation,
-      isInfinite, isGenerated,
-      children: []
-    };
+    return { id, name, birth, gender, generation, isInfinite, isGenerated, children: [] };
   }
 
   function findNodeById(node, id) {
