@@ -10,6 +10,7 @@
  *   - Яркие пульсы для реальных, тусклые для сгенерированных
  *   - Кнопка «Сброс рода» — медленное исчезновение
  *   - Адаптивные размеры под устройство
+ *   - Дерево центрируется по корню (Демир)
  */
 
 // ============================================
@@ -93,7 +94,8 @@ const pulseLayer    = g.append('g').attr('class', 'pulse-layer');
 const nodeLayer     = g.append('g').attr('class', 'nodes-layer');
 const particleLayer = g.append('g').attr('class', 'particle-layer');
 
-const offsetX = width / 2;
+// ⬇️ let — потому что будет пересчитано при центрировании
+let offsetX = width / 2;
 const offsetY = IS_MOBILE ? height * 0.06 : height * 0.1;
 
 // === ЗУМ ===
@@ -152,10 +154,8 @@ const JITTER = {
 
 const GENERATION_STEP_Y = IS_MOBILE ? 70 : 90;
 const GENERATION_STEP_Y_MIN = IS_MOBILE ? 60 : 80;
-// ⬇️ УМЕНЬШЕНО — сгенерированные стоят почти под родителем
 const PARENT_SIDE_OFFSET = IS_MOBILE ? 12 : 15;
 
-// ⬇️ ОБНОВЛЕНО — разрешаем сгенерированным стоять близко
 function enforceNoOverlapX(root) {
   const allNodes = root.descendants();
 
@@ -172,7 +172,6 @@ function enforceNoOverlapX(root) {
       const prev = nodesAtDepth[i - 1];
       const curr = nodesAtDepth[i];
 
-      // Оба сгенерированы — разрешаем стоять в 30px друг от друга
       const bothGenerated = prev.data.isGenerated && curr.data.isGenerated;
       const minDx = bothGenerated ? 30 : CARD_MIN_DX;
 
@@ -254,6 +253,17 @@ function adjustAllPositions(root) {
 
 adjustAllPositions(root);
 
+// === ЦЕНТРИРОВАНИЕ ПО КОРНЮ ===
+function centerRoot() {
+  // Считаем средний X всех узлов и смещаем так, чтобы корень был в центре
+  const rootX = root.x;
+  offsetX = width / 2 - rootX;
+
+  console.log(`📐 Центрирование: root.x = ${rootX.toFixed(1)}, offsetX = ${offsetX.toFixed(1)}`);
+}
+
+centerRoot();
+
 // === БЕСКОНЕЧНОСТЬ ===
 function getGenerationStyle(generation) {
   const t = generation / CONFIG.maxGeneration;
@@ -264,17 +274,15 @@ function getGenerationStyle(generation) {
   };
 }
 
-// === СВЯЗИ — ВЕРТИКАЛЬНЫЕ S-КРИВЫЕ, БЕЗ РАСТЯЖЕНИЯ В СТОРОНЫ ===
+// === СВЯЗИ ===
 function organicLink(d) {
   const sx = d.source.x + offsetX;
   const sy = d.source.y + offsetY;
   const tx = d.target.x + offsetX;
   const ty = d.target.y + offsetY;
 
-  // Изгиб по вертикали, БЕЗ бокового сдвига
   const midY = (sy + ty) / 2;
 
-  // Кривая начинается и приходит вертикально
   return `M${sx},${sy} C${sx},${midY} ${tx},${midY} ${tx},${ty}`;
 }
 
@@ -431,6 +439,10 @@ function rebuildAndRender() {
   });
 
   root = newRoot;
+
+  // ⬇️ ЦЕНТРИРУЕМ ПО НОВОМУ КОРНЮ
+  centerRoot();
+
   renderTree(true);
 }
 
@@ -876,6 +888,9 @@ function clearGeneratedAncestors() {
     treeLayout(newRoot);
     adjustAllPositions(newRoot);
     root = newRoot;
+
+    // ⬇️ ЦЕНТРИРУЕМ ПОСЛЕ СБРОСА
+    centerRoot();
 
     renderTree(true);
 
