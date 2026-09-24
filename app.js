@@ -142,16 +142,48 @@ function getGenerationStyle(generation) {
 }
 
 // === РИСУЕМ СВЯЗИ ===
-const linkGenerator = d3.linkVertical()
-  .x(d => d.x + offsetX)
-  .y(d => d.y + offsetY);
+// const linkGenerator = d3.linkVertical()
+//   .x(d => d.x + offsetX)
+//   .y(d => d.y + offsetY);
+
+// const links = linkLayer.selectAll('.link')
+//   .data(root.links())
+//   .enter()
+//   .append('path')
+//   .attr('class', 'link')
+//   .attr('d', linkGenerator)
+//   .attr('stroke', d => {
+//     const { opacity } = getGenerationStyle(d.target.depth);
+//     return `rgba(74, 158, 255, ${opacity * 0.5})`;
+//   })
+//   .attr('stroke-width', d => {
+//     const { scale } = getGenerationStyle(d.target.depth);
+//     return 1.5 * scale;
+//   });
+
+
+// Органические кривые — не прямые, а изогнутые
+function organicLink(d) {
+  const sx = d.source.x + offsetX;
+  const sy = d.source.y + offsetY;
+  const tx = d.target.x + offsetX;
+  const ty = d.target.y + offsetY;
+
+  const midY = (sy + ty) / 2;
+  const bend = (tx - sx) * 0.25; // небольшой изгиб в сторону
+
+  return `M${sx},${sy}
+          C${sx + bend},${midY}
+           ${tx - bend},${midY}
+           ${tx},${ty}`;
+}
 
 const links = linkLayer.selectAll('.link')
   .data(root.links())
   .enter()
   .append('path')
   .attr('class', 'link')
-  .attr('d', linkGenerator)
+  .attr('d', organicLink)
   .attr('stroke', d => {
     const { opacity } = getGenerationStyle(d.target.depth);
     return `rgba(74, 158, 255, ${opacity * 0.5})`;
@@ -160,6 +192,7 @@ const links = linkLayer.selectAll('.link')
     const { scale } = getGenerationStyle(d.target.depth);
     return 1.5 * scale;
   });
+
 
 // === РИСУЕМ УЗЛЫ ===
 const nodes = nodeLayer.selectAll('.node')
