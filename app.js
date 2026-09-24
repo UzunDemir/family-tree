@@ -2,11 +2,11 @@
  * Семейное древо Узун — D3.js + бесконечные корни
  * 
  * Правила:
- *   - ЛЮБОЙ узел (реальный или сгенерированный) ВСЕГДА ниже родителя
+ *   - ЛЮБОЙ узел ВСЕГДА ниже родителя
  *   - Сгенерированные узлы БЕЗ имён
- *   - Jitter: по X свободно, по Y только вниз
- *   - Карточки НЕ наезжают друг на друга
- *   - Дыхание только вниз (не поднимает узел выше родителя)
+ *   - Jitter: по X НЕТ, по Y только вниз
+ *   - Карточки НЕ наезжают друг на друга (жёсткое раздвигание по X)
+ *   - Дыхание только вниз
  */
 
 // === КОНФИГУРАЦИЯ ===
@@ -39,7 +39,6 @@ const CONFIG = {
 
   infiniteRoots: {
     enabled: true,
-    loadDepth: 3,
     autoLoadDelay: 800,
     maxGenerations: 12
   }
@@ -73,7 +72,7 @@ const nodeLayer     = g.append('g').attr('class', 'nodes-layer');
 const particleLayer = g.append('g').attr('class', 'particle-layer');
 
 const offsetX = width / 2;
-const offsetY = height * 0.15;
+const offsetY = height * 0.1;
 
 // === ЗУМ ===
 const zoom = d3.zoom()
@@ -90,9 +89,20 @@ svg.call(zoom);
 // === ПОСТРОЕНИЕ ===
 let root = d3.hierarchy(buildHierarchy(familyData));
 
+// Шаг между карточками по X — жёсткий
+const CARD_MIN_DX = CONFIG.cardWidth + 40;   // 180px
+const CARD_MIN_DY = CONFIG.cardHeight + 30;  // 86px
+
+// Размер дерева подстраиваем под ширину экрана и число листьев
 const treeLayout = d3.tree()
-  .size([width * 0.85, height * 0.7])
-  .separation((a, b) => (a.parent === b.parent ? 1.4 : 2.2));
+  .size([width * 0.95, height * 0.7])
+  .separation((a, b) => {
+    if (a.parent === b.parent) {
+      // Соседи — считаем через CARD_MIN_DX / ширину
+      return CARD_MIN_DX / (width * 0.95);
+    }
+    return (CARD_MIN_DX * 1.4) / (width * 0.95);
+  });
 
 treeLayout(root);
 
@@ -105,77 +115,53 @@ function hashNoise(id, seed = 0) {
   return ((h % 1000) / 1000) * 2 - 1;
 }
 
-// === НЕРОВНОЕ РАСПОЛОЖЕНИЕ ===
+// === JITTER (только Y и наклон) ===
 const JITTER = {
-  xByDepth:      [20, 35, 55, 80],
-  yByDepth:      [15, 25, 40, 55],
-  rotateByDepth: [0, 1.5, 3, 5]
+  yByDepth:      [20, 30, 45, 60],   // только вниз
+  rotateByDepth: [0, 1, 2, 3]
 };
 
 const GENERATION_STEP_Y = 90;
 const GENERATION_STEP_Y_MIN = 80;
 const PARENT_SIDE_OFFSET = 35;
 
-// Минимальные расстояния между карточками (анти-наезд)
-const CARD_MIN_DX = CONFIG.cardWidth + 30;   // 170px
-const CARD_MIN_DY = CONFIG.cardHeight + 40;  // 96px
-
-function resolveCollisions(root, iterations = 12) {
+// Жёсткое раздвигание по X на одном уровне
+function enforceNoOverlapX(root) {
   const allNodes = root.descendants();
 
-  for (let iter = 0; iter < iterations; iter++) {
-    let moved = false;
+  // Группируем по глубине
+  const byDepth = {};
+  allNodes.forEach(d => {
+    if (!byDepth[d.depth]) byDepth[d.depth] = [];
+    byDepth[d.depth].push(d);
+  });
 
-    for (let i = 0; i < allNodes.length; i++) {
-      for (let j = i + 1; j < allNodes.length; j++) {
-        const a = allNodes[i];
-        const b = allNodes[j];
+  Object.values(byDepth).forEach(nodesAtDepth => {
+    // Сортируем по X
+    nodesAtDepth.sort((a, b) => a.x - b.x);
 
-        // Не раздвигаем прямых родителя и ребёнка — они связаны вертикально
-        if (a.parent === b || b.parent === a) continue;
+    // Раздвигаем от центра наружу
+    for (let i = 1; i < nodesAtDepth.length; i++) {
+      const prev = nodesAtDepth[i - 1];
+      const curr = nodesAtDepth[i];
+      const dx = curr.x - prev.x;
 
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const absDx = Math.abs(dx);
-        const absDy = Math.abs(dy);
-
-        // Пересечение по обеим осям?
-        if (absDx < CARD_MIN_DX && absDy < CARD_MIN_DY) {
-          moved = true;
-
-          const overlapX = CARD_MIN_DX - absDx;
-          const overlapY = CARD_MIN_DY - absDy;
-
-          // Раздвигаем по оси с меньшим пересечением
-          if (overlapX / CARD_MIN_DX < overlapY / CARD_MIN_DY) {
-            // Раздвигаем по X
-            const push = overlapX / 2 + 1;
-            const dir = dx >= 0 ? 1 : -1;
-            a.x -= dir * push;
-            b.x += dir * push;
-          } else {
-            // Раздвигаем по Y — ТОЛЬКО ВНИЗ
-            const push = overlapY / 2 + 1;
-            if (dy >= 0) {
-              b.y += push * 2;
-            } else {
-              a.y += push * 2;
-            }
-          }
-
-          // Гарантия: ребёнок всё равно ниже родителя
-          if (a.parent && a.y < a.parent.y + GENERATION_STEP_Y_MIN) {
-            a.y = a.parent.y + GENERATION_STEP_Y_MIN;
-          }
-          if (b.parent && b.y < b.parent.y + GENERATION_STEP_Y_MIN) {
-            b.y = b.parent.y + GENERATION_STEP_Y_MIN;
-          }
-        }
+      if (dx < CARD_MIN_DX) {
+        const push = (CARD_MIN_DX - dx) / 2 + 1;
+        prev.x -= push;
+        curr.x += push;
       }
     }
 
-    if (!moved) break;
-  }
+    // Ещё раз, чтобы всё гарантированно разъехалось
+    for (let i = 1; i < nodesAtDepth.length; i++) {
+      const prev = nodesAtDepth[i - 1];
+      const curr = nodesAtDepth[i];
+      if (curr.x - prev.x < CARD_MIN_DX) {
+        curr.x = prev.x + CARD_MIN_DX;
+      }
+    }
+  });
 }
 
 function adjustAllPositions(root) {
@@ -185,16 +171,17 @@ function adjustAllPositions(root) {
     .sort((a, b) => a.depth - b.depth);
 
   realNodes.forEach(node => {
-    const depth = Math.min(node.depth, JITTER.xByDepth.length - 1);
+    const depth = Math.min(node.depth, JITTER.yByDepth.length - 1);
 
-    // Jitter по X — свободный
-    node.x += hashNoise(node.data.id, 1) * JITTER.xByDepth[depth];
-    node.rotation = hashNoise(node.data.id, 3) * JITTER.rotateByDepth[depth];
-
-    // Jitter по Y — только вниз
+    // Только Y jitter, только вниз
     const yJitter = Math.abs(hashNoise(node.data.id, 2)) * JITTER.yByDepth[depth];
     node.y += yJitter;
 
+    // Наклон
+    const rotDepth = Math.min(node.depth, JITTER.rotateByDepth.length - 1);
+    node.rotation = hashNoise(node.data.id, 3) * JITTER.rotateByDepth[rotDepth];
+
+    // Ребёнок всегда ниже родителя
     if (node.parent) {
       const minY = node.parent.y + GENERATION_STEP_Y_MIN;
       if (node.y < minY) node.y = minY;
@@ -214,16 +201,26 @@ function adjustAllPositions(root) {
       ? -PARENT_SIDE_OFFSET
       : PARENT_SIDE_OFFSET;
 
-    const sideJitter = hashNoise(node.data.id, 11) * 25;
     const yJitter = Math.abs(hashNoise(node.data.id, 12)) * 20;
 
-    node.x = parent.x + baseSideOffset + sideJitter;
+    node.x = parent.x + baseSideOffset;
     node.y = parent.y + GENERATION_STEP_Y + yJitter;
-    node.rotation = hashNoise(node.data.id, 13) * 4;
+    node.rotation = hashNoise(node.data.id, 13) * 3;
   });
 
-  // === 3. РАЗРЕШАЕМ КОЛЛИЗИИ ===
-  resolveCollisions(root, 12);
+  // === 3. ЖЁСТКОЕ РАЗДВИГАНИЕ ПО X ===
+  enforceNoOverlapX(root);
+
+  // === 4. ФИНАЛЬНАЯ ПРОВЕРКА ВЕРТИКАЛИ ===
+  // После раздвигания по X — снова убеждаемся, что дети ниже родителей
+  root.descendants()
+    .sort((a, b) => a.depth - b.depth)
+    .forEach(node => {
+      if (node.parent) {
+        const minY = node.parent.y + GENERATION_STEP_Y_MIN;
+        if (node.y < minY) node.y = minY;
+      }
+    });
 }
 
 adjustAllPositions(root);
@@ -799,7 +796,7 @@ if (CONFIG.breathing.enabled) {
 
       nodeLayer.selectAll('.node').attr('transform', function(d) {
         const amp = CONFIG.breathing.baseAmp + d.depth * CONFIG.breathing.ampPerDepth;
-        const finalAmp = d.data.isGenerated ? amp * 0.6 : amp;
+        const finalAmp = d.data.isGenerated ? amp * 0.4 : amp;
 
         const dur = CONFIG.breathing.minDuration +
                     (hashNoise(d.data.id, 7) + 1) / 2 *
@@ -808,9 +805,10 @@ if (CONFIG.breathing.enabled) {
         const phase = (hashNoise(d.data.id, 9) + 1) * Math.PI;
         const t = (now - startTime) / dur + phase;
 
-        // X — свободно, Y — только вниз
-        const dx = Math.sin(t) * finalAmp;
-        const dy = Math.abs(Math.cos(t * 0.7)) * finalAmp * 0.3;
+        // X — маленькое (чтобы не наезжали)
+        const dx = Math.sin(t) * Math.min(finalAmp, 3);
+        // Y — только вниз
+        const dy = Math.abs(Math.cos(t * 0.7)) * Math.min(finalAmp, 3);
 
         return nodeTransform(d, dx, dy);
       });
