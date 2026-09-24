@@ -1,5 +1,6 @@
 /**
- * Семейное древо Узун — D3.js + бесконечные корни (растут ВВЕРХ, «живые»)
+ * Семейное древо Узун — D3.js + бесконечные корни
+ * Корни растут ВВЕРХ по экрану, от любого узла, «живые»
  */
 
 // === КОНФИГУРАЦИЯ ===
@@ -143,7 +144,7 @@ function adjustAllPositions(root) {
     }
   });
 
-  // 2. Сгенерированные — «живые», но строго вверх
+  // 2. Сгенерированные — «живые», растут ВВЕРХ по экрану
   const generated = root.descendants()
     .filter(d => d.data.isGenerated)
     .sort((a, b) => a.depth - b.depth);
@@ -152,20 +153,19 @@ function adjustAllPositions(root) {
     const parent = node.parent;
     if (!parent) return;
 
-    // Боковое смещение: отец/мать друг от друга
     const baseSideOffset = node.data.gender === 'male'
       ? -PARENT_SIDE_OFFSET
       : PARENT_SIDE_OFFSET;
 
-    // Живой сдвиг в стороны — ±25px, детерминированный
+    // Живой сдвиг в стороны
     const sideJitter = hashNoise(node.data.id, 11) * 25;
-
-    // Вертикальный сдвиг — лёгкий разброс
+    // Вертикальный разброс
     const yJitter = hashNoise(node.data.id, 12) * 20;
-
-    // Наклон — ±4°
+    // Наклон
     const rotation = hashNoise(node.data.id, 13) * 4;
 
+    // ВАЖНО: минус — уводит визуально ВВЕРХ по экрану
+    // (offsetY компенсирует инверсию D3)
     node.x = parent.x + baseSideOffset + sideJitter;
     node.y = parent.y - GENERATION_STEP_Y - yJitter;
     node.rotation = rotation;
@@ -194,7 +194,6 @@ function organicLink(d) {
   const tx = d.target.x + offsetX;
   const ty = d.target.y + offsetY;
 
-  // Для сгенерированных — мягкий изгиб
   const isGenerated = d.target.data.isGenerated;
   const bendFactor = isGenerated ? 0.15 : 0.25;
 
@@ -270,8 +269,20 @@ function findInFamilyData(node, id) {
 
 // Загружает следующее поколение
 function loadNextGeneration(datum) {
-  if (datum.depth >= IR.maxGenerations) return false;
-  if (datum._childrenLoaded) return false;
+  if (datum.depth >= IR.maxGenerations) {
+    console.log('⛔ Достигнут максимум поколений');
+    return false;
+  }
+  if (datum._childrenLoaded) {
+    console.log('↻ Уже загружено:', datum.data.name);
+    return false;
+  }
+
+  // НЕ генерируем, если у узла УЖЕ есть дети (реальные)
+  if (datum.data.children && datum.data.children.length > 0) {
+    console.log('⏭ Узел уже имеет предков:', datum.data.name);
+    return false;
+  }
 
   const father = generateAncestor(datum.data.id, datum.data.birth, datum.depth, 'father');
   const mother = generateAncestor(datum.data.id, datum.data.birth, datum.depth, 'mother');
@@ -341,14 +352,16 @@ let autoLoadTimer = null;
 function scheduleAutoLoad() {
   clearTimeout(autoLoadTimer);
   autoLoadTimer = setTimeout(() => {
-    const deepest = root.descendants()
-      .filter(d => d.depth >= IR.loadDepth && !d._childrenLoaded)
+    // Теперь ЛЮБОЙ узел без загруженных предков — кандидат
+    const candidates = root.descendants()
+      .filter(d => !d._childrenLoaded)
+      .filter(d => !d.data.children || d.data.children.length === 0)
       .sort((a, b) => b.depth - a.depth);
 
-    if (deepest.length === 0) return;
+    if (candidates.length === 0) return;
 
     let loaded = 0;
-    for (const d of deepest.slice(0, 3)) {
+    for (const d of candidates.slice(0, 3)) {
       if (loadNextGeneration(d)) loaded++;
       if (loaded >= 3) break;
     }
@@ -551,7 +564,8 @@ function attachNodeHandlers(selection) {
 
     animateAncestorWave(d);
 
-    if (CONFIG.infiniteRoots.enabled && d.depth >= CONFIG.infiniteRoots.loadDepth) {
+    // ГЕНЕРИРУЕМ ОТ ЛЮБОГО УЗЛА (если у него ещё нет детей)
+    if (CONFIG.infiniteRoots.enabled && !d._childrenLoaded) {
       setTimeout(() => manualLoad(d), 400);
     }
   });
@@ -746,10 +760,7 @@ if (CONFIG.breathing.enabled) {
       const now = Date.now();
 
       nodeLayer.selectAll('.node').attr('transform', function(d) {
-        // Амплитуда зависит от поколения
         const amp = CONFIG.breathing.baseAmp + d.depth * CONFIG.breathing.ampPerDepth;
-
-        // Сгенерированные дышат мягче — они дальше
         const finalAmp = d.data.isGenerated ? amp * 0.6 : amp;
 
         const dur = CONFIG.breathing.minDuration +
