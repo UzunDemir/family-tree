@@ -6,8 +6,8 @@
  *   - Сгенерированные узлы БЕЗ имён
  *   - Jitter: по X НЕТ, по Y только вниз
  *   - Карточки НЕ наезжают друг на друга
- *   - Яркие пульсы для реальных предков, тусклые для сгенерированных
- *   - Кнопка «Сброс рода» — плавное удаление сгенерированных
+ *   - Яркие пульсы для реальных, тусклые для сгенерированных
+ *   - Кнопка «Сброс рода» — медленное исчезновение бесконечных предков
  */
 
 // === КОНФИГУРАЦИЯ ===
@@ -113,7 +113,7 @@ function hashNoise(id, seed = 0) {
   return ((h % 1000) / 1000) * 2 - 1;
 }
 
-// === JITTER (только Y и наклон) ===
+// === JITTER ===
 const JITTER = {
   yByDepth:      [20, 30, 45, 60],
   rotateByDepth: [0, 1, 2, 3]
@@ -123,7 +123,6 @@ const GENERATION_STEP_Y = 90;
 const GENERATION_STEP_Y_MIN = 80;
 const PARENT_SIDE_OFFSET = 35;
 
-// Жёсткое раздвигание по X
 function enforceNoOverlapX(root) {
   const allNodes = root.descendants();
 
@@ -159,7 +158,6 @@ function enforceNoOverlapX(root) {
 }
 
 function adjustAllPositions(root) {
-  // 1. Реальные предки
   const realNodes = root.descendants()
     .filter(d => !d.data.isGenerated)
     .sort((a, b) => a.depth - b.depth);
@@ -179,7 +177,6 @@ function adjustAllPositions(root) {
     }
   });
 
-  // 2. Сгенерированные
   const generated = root.descendants()
     .filter(d => d.data.isGenerated)
     .sort((a, b) => a.depth - b.depth);
@@ -199,10 +196,8 @@ function adjustAllPositions(root) {
     node.rotation = hashNoise(node.data.id, 13) * 3;
   });
 
-  // 3. Жёсткое раздвигание по X
   enforceNoOverlapX(root);
 
-  // 4. Финальная вертикаль
   root.descendants()
     .sort((a, b) => a.depth - b.depth)
     .forEach(node => {
@@ -708,7 +703,7 @@ function animateAncestorWave(node) {
     .classed('dimmed', d => !ancestorIds.has(d.target.data.id));
 }
 
-// === СБРОС ===
+// === СБРОС ПОДСВЕТКИ ===
 function resetHighlight() {
   nodeLayer.selectAll('.card-bg')
     .classed('highlighted', false)
@@ -732,70 +727,93 @@ function clearGeneratedAncestors() {
   const generatedNodes = nodeLayer.selectAll('.node')
     .filter(d => d.data.isGenerated);
 
-  const generatedLinks = linkLayer.selectAll('.link')
-    .filter(d => d.target.data.isGenerated);
-
-  const generatedPulses = pulseLayer.selectAll('.pulse')
-    .filter(d => d.target.data.isGenerated);
-
   if (generatedNodes.empty()) {
     console.log('ℹ️ Нет сгенерированных предков для удаления');
     return;
   }
 
-  // Пульсы — гаснут
-  generatedPulses
-    .transition()
-    .duration(2000)
-    .ease(d3.easeCubicOut)
-    .attr('opacity', 0)
-    .remove();
+  console.log(`🗑️ Найдено ${generatedNodes.size()} сгенерированных узлов`);
 
-  // Связи — растворяются
-  generatedLinks
-    .transition()
-    .duration(2000)
-    .ease(d3.easeCubicOut)
-    .style('opacity', 0)
-    .attr('stroke-opacity', 0)
-    .remove();
-
-  // Узлы — сжимаются и исчезают
+  // === ФАЗА 1: плавное исчезновение ===
   generatedNodes
     .transition()
-    .duration(2000)
+    .duration(1800)
     .ease(d3.easeCubicOut)
     .style('opacity', 0)
     .attr('transform', function(d) {
       const { scale } = getGenerationStyle(d.depth);
       const rot = d.rotation || 0;
-      // Сжимаем к 0
       return `translate(${d.x + offsetX}, ${d.y + offsetY}) rotate(${rot}) scale(${scale * 0.2})`;
-    })
-    .remove();
+    });
 
-  // Через 2.1 сек — чистим familyData и пересобираем
+  linkLayer.selectAll('.link')
+    .filter(d => d.target.data.isGenerated)
+    .transition()
+    .duration(1800)
+    .ease(d3.easeCubicOut)
+    .style('opacity', 0);
+
+  pulseLayer.selectAll('.pulse')
+    .filter(d => d.target.data.isGenerated)
+    .transition()
+    .duration(1800)
+    .ease(d3.easeCubicOut)
+    .attr('opacity', 0);
+
+  // === ФАЗА 2: чистка familyData + пересборка ===
   setTimeout(() => {
-    function cleanNode(node) {
-      if (!node.children || node.children.length === 0) return;
+    console.log('🧹 Чищу familyData от сгенерированных...');
+
+    // Рекурсивная очистка каждого узла
+    function deepClean(node) {
+      if (!node || !node.children || node.children.length === 0) return;
       node.children = node.children.filter(c => !c.isGenerated);
-      node.children.forEach(cleanNode);
+      node.children.forEach(deepClean);
     }
 
-    (familyData.parents || []).forEach(cleanNode);
-    (familyData.grandparents || []).forEach(cleanNode);
-    (familyData.greatGrandparents || []).forEach(cleanNode);
+    // Очищаем ВСЕ узлы во всех массивах
+    function walkAll(node) {
+      if (!node) return;
+      deepClean(node);
+      if (node.children) {
+        node.children.forEach(walkAll);
+      }
+    }
 
+    // Проходим по всем верхним массивам + сам familyData
+    walkAll(familyData);
+    (familyData.parents || []).forEach(walkAll);
+    (familyData.grandparents || []).forEach(walkAll);
+    (familyData.greatGrandparents || []).forEach(walkAll);
+
+    // Проверка в консоли
+    let remaining = 0;
+    root.descendants().forEach(d => { if (d.data.isGenerated) remaining++; });
+    console.log(`🔍 Осталось сгенерированных в D3 до пересборки: ${remaining}`);
+
+    // === ЖЁСТКАЯ ПЕРЕСБОРКА ===
+    console.log('🔄 Пересобираю дерево...');
+
+    // Полностью удаляем все DOM-элементы
+    nodeLayer.selectAll('.node').remove();
+    linkLayer.selectAll('.link').remove();
+    pulseLayer.selectAll('.pulse').remove();
+
+    // Пересобираем данные
     const newHierarchyData = buildHierarchy(familyData);
     const newRoot = d3.hierarchy(newHierarchyData);
     treeLayout(newRoot);
     adjustAllPositions(newRoot);
     root = newRoot;
+
+    // Строим заново
     renderTree(true);
 
-    console.log('✅ Все сгенерированные предки удалены');
+    console.log('✅ Сброс завершён. Глубина:', 
+      root.descendants().reduce((max, d) => Math.max(max, d.depth), 0) + 1, 'поколений');
+
     showDepthStatus();
-  }, 2100);
+  }, 1900);
 }
 
 // === ПЕРВИЧНЫЙ РЕНДЕР ===
