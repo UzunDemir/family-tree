@@ -1,27 +1,22 @@
 /**
  * Данные семейного древа Узун
  * Основано на tree.xlsx
- * 
- * Структура:
- *  - generation 0 — младший (Демир)
- *  - generation 3 — самые старшие (прародители), «уходят в бесконечность»
- *  - isInfinite: true — узлы, от которых можно продолжить род процедурно
  */
 
-const familyData = {
+// ВАЖНО: let, а не const — чтобы можно было мутировать
+let familyData = {
   id: "demir",
   name: "Узун Демир",
   birth: "24.12.2016",
   gender: "male",
   generation: 0,
+  children: [],
 
-  // Родители
   parents: [
     { id: "vitaliy", name: "Узун Виталий", birth: "02.12.1974", gender: "male", generation: 1 },
     { id: "natalia", name: "Симонова Наталья", birth: "26.02.1982", gender: "female", generation: 1 }
   ],
 
-  // Бабушки и дедушки (2-е поколение)
   grandparents: [
     { id: "nikolay",   name: "Узун Николай",      birth: "24.02.1945", gender: "male",   generation: 2, side: "father" },
     { id: "olga",      name: "Белиогло Ольга",    birth: "06.08.1950", gender: "female", generation: 2, side: "father" },
@@ -29,8 +24,6 @@ const familyData = {
     { id: "nina",      name: "Цугуй Нина",        birth: "21.01.1958", gender: "female", generation: 2, side: "mother" }
   ],
 
-  // Прародители (3-е поколение — «бесконечность»)
-  // isInfinite: true — от этих узлов можно генерировать предков дальше
   greatGrandparents: [
     { id: "petr",    name: "Узун Пётр",         birth: null,         gender: "male",   generation: 3, parentOf: "nikolay",   isInfinite: true },
     { id: "ivanka",  name: "Иванка",            birth: null,         gender: "female", generation: 3, parentOf: "nikolay",   isInfinite: true },
@@ -44,52 +37,31 @@ const familyData = {
 };
 
 /**
- * Строит иерархию D3 из плоских данных
- * 
- * @returns {Object} корневой узел для d3.hierarchy()
+ * Строит иерархию для D3 из familyData
+ * Рекурсивно обходит все узлы, включая сгенерированных предков
  */
 function buildHierarchy(data) {
-  const root = {
-    id: data.id,
-    name: data.name,
-    birth: data.birth,
-    gender: data.gender,
-    generation: data.generation,
-    isInfinite: false,
-    children: []
-  };
-
-  // === Поколение 1 — родители ===
-  const parents = {};
-  (data.parents || []).forEach(p => {
-    const node = {
-      id: p.id,
-      name: p.name,
-      birth: p.birth,
-      gender: p.gender,
-      generation: p.generation,
-      isInfinite: false,
+  function makeNode(id, name, birth, gender, generation, isInfinite = false, isGenerated = false) {
+    return {
+      id, name, birth, gender, generation,
+      isInfinite, isGenerated,
       children: []
     };
+  }
+
+  const root = makeNode(data.id, data.name, data.birth, data.gender, data.generation);
+
+  const parents = {};
+  (data.parents || []).forEach(p => {
+    const node = makeNode(p.id, p.name, p.birth, p.gender, p.generation);
     parents[p.id] = node;
     root.children.push(node);
   });
 
-  // === Поколение 2 — бабушки/дедушки ===
   const grandparents = {};
   (data.grandparents || []).forEach(gp => {
-    const node = {
-      id: gp.id,
-      name: gp.name,
-      birth: gp.birth,
-      gender: gp.gender,
-      generation: gp.generation,
-      isInfinite: false,
-      children: []
-    };
+    const node = makeNode(gp.id, gp.name, gp.birth, gp.gender, gp.generation);
     grandparents[gp.id] = node;
-
-    // Привязываем к соответствующему родителю
     if (gp.side === "father" && parents["vitaliy"]) {
       parents["vitaliy"].children.push(node);
     } else if (gp.side === "mother" && parents["natalia"]) {
@@ -97,22 +69,38 @@ function buildHierarchy(data) {
     }
   });
 
-  // === Поколение 3 — прародители (с isInfinite) ===
   (data.greatGrandparents || []).forEach(ggp => {
-    const node = {
-      id: ggp.id,
-      name: ggp.name,
-      birth: ggp.birth,
-      gender: ggp.gender,
-      generation: ggp.generation,
-      isInfinite: ggp.isInfinite || false,
-      children: []
-    };
-    const targetParent = grandparents[ggp.parentOf];
-    if (targetParent) {
-      targetParent.children.push(node);
-    }
+    const node = makeNode(ggp.id, ggp.name, ggp.birth, ggp.gender, ggp.generation, ggp.isInfinite || false);
+    const target = grandparents[ggp.parentOf];
+    if (target) target.children.push(node);
   });
+
+  // ВАЖНО: переносим сгенерированных детей, если они уже есть
+  // Они хранятся в familyData.greatGrandparents[i].children
+  function attachGenerated(node, sourceArray) {
+    if (!sourceArray) return;
+    sourceArray.forEach(src => {
+      const target = findNodeById(node, src.id);
+      if (target && src.children && src.children.length > 0) {
+        target.children = src.children.map(c => 
+          makeNode(c.id, c.name, c.birth, c.gender, c.generation, false, true)
+        );
+        // Рекурсивно для следующих поколений
+        src.children.forEach(c => attachGenerated(target, [c]));
+      }
+    });
+  }
+
+  function findNodeById(node, id) {
+    if (node.id === id) return node;
+    for (const child of node.children) {
+      const found = findNodeById(child, id);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  attachGenerated(root, data.greatGrandparents);
 
   return root;
 }
