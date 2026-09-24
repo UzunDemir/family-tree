@@ -733,4 +733,44 @@ if (CONFIG.breathing.enabled) {
   let zoomActive = false;
   let entranceDone = false;
 
-  svg.on('mousedown.breathing', ()
+  svg.on('mousedown.breathing', () => { zoomActive = true; });
+  svg.on('mouseup.breathing',   () => { zoomActive = false; });
+  svg.on('mouseleave.breathing',() => { zoomActive = false; });
+  svg.on('touchend.breathing',  () => { zoomActive = false; });
+
+  setTimeout(() => { entranceDone = true; }, CONFIG.duration.entrance + 200);
+
+  function breathe() {
+    if (entranceDone && !zoomActive) {
+      const now = Date.now();
+
+      nodeLayer.selectAll('.node').attr('transform', function(d) {
+        const amp = CONFIG.breathing.baseAmp + d.depth * CONFIG.breathing.ampPerDepth;
+
+        const dur = CONFIG.breathing.minDuration +
+                    (hashNoise(d.data.id, 7) + 1) / 2 *
+                    (CONFIG.breathing.maxDuration - CONFIG.breathing.minDuration);
+
+        const phase = (hashNoise(d.data.id, 9) + 1) * Math.PI;
+        const t = (now - startTime) / dur + phase;
+
+        const dx = Math.sin(t) * amp;
+        const dy = Math.cos(t * 0.7) * amp * 0.6;
+
+        return nodeTransform(d, dx, dy);
+      });
+    }
+    requestAnimationFrame(breathe);
+  }
+  breathe();
+}
+
+// === ИНДИКАТОР ГЛУБИНЫ ===
+const footer = document.getElementById('footer');
+if (footer && !document.getElementById('infinite-status')) {
+  const status = document.createElement('span');
+  status.id = 'infinite-status';
+  status.style.cssText = 'margin-left: 16px; color: #a06bff; transition: opacity 0.5s; opacity: 0.4;';
+  status.textContent = `🌌 Глубина рода: ${root.descendants().reduce((max, d) => Math.max(max, d.depth), 0) + 1} поколений`;
+  footer.appendChild(status);
+}
