@@ -1,6 +1,6 @@
 /**
  * Семейное древо Узун — D3.js + бесконечные корни
- * Корни растут ВВЕРХ по экрану, от любого узла, «живые»
+ * Корни растут ВНИЗ по экрану, безымянные
  */
 
 // === КОНФИГУРАЦИЯ ===
@@ -35,22 +35,7 @@ const CONFIG = {
     enabled: true,
     loadDepth: 3,
     autoLoadDelay: 800,
-    maxGenerations: 12,
-    namesMale: [
-      'Иван', 'Пётр', 'Николай', 'Александр', 'Трофим', 'Павел', 'Григорий',
-      'Степан', 'Фёдор', 'Дмитрий', 'Сергей', 'Михаил', 'Андрей', 'Василий',
-      'Тимофей', 'Игнат', 'Ефим', 'Савелий', 'Архип', 'Прокопий'
-    ],
-    namesFemale: [
-      'Мария', 'Ольга', 'Нина', 'Марфа', 'Иванка', 'Мотрика', 'Анна', 'Елена',
-      'Татьяна', 'Дарья', 'Аксинья', 'Пелагея', 'Устинья', 'Аграфена',
-      'Евдокия', 'Матрёна', 'Феодосия', 'Прасковья', 'Глафира', 'Василиса'
-    ],
-    surnames: [
-      'Узун', 'Белиогло', 'Симонов', 'Цугуй', 'Боян', 'Радиш', 'Маракуца',
-      'Иванов', 'Петров', 'Ковалёв', 'Мельник', 'Ткачук', 'Бондарь', 'Морарь',
-      'Гриценко', 'Лунгу', 'Чобану', 'Дабижа', 'Русу', 'Кожокару'
-    ]
+    maxGenerations: 12
   }
 };
 
@@ -121,9 +106,7 @@ const JITTER = {
   rotateByDepth: [0, 1.5, 3, 5]
 };
 
-// Вертикальный шаг между поколениями
 const GENERATION_STEP_Y = 90;
-// Боковое смещение отца/матери
 const PARENT_SIDE_OFFSET = 35;
 
 function adjustAllPositions(root) {
@@ -144,7 +127,7 @@ function adjustAllPositions(root) {
     }
   });
 
-  // 2. Сгенерированные — «живые», растут ВВЕРХ по экрану
+  // 2. Сгенерированные — растут ВНИЗ по экрану
   const generated = root.descendants()
     .filter(d => d.data.isGenerated)
     .sort((a, b) => a.depth - b.depth);
@@ -157,15 +140,11 @@ function adjustAllPositions(root) {
       ? -PARENT_SIDE_OFFSET
       : PARENT_SIDE_OFFSET;
 
-    // Живой сдвиг в стороны
     const sideJitter = hashNoise(node.data.id, 11) * 25;
-    // Вертикальный разброс
     const yJitter = hashNoise(node.data.id, 12) * 20;
-    // Наклон
     const rotation = hashNoise(node.data.id, 13) * 4;
 
-    // ВАЖНО: минус — уводит визуально ВВЕРХ по экрану
-    // (offsetY компенсирует инверсию D3)
+    // ПЛЮС — сгенерированные уходят ВНИЗ по экрану
     node.x = parent.x + baseSideOffset + sideJitter;
     node.y = parent.y + GENERATION_STEP_Y + yJitter;
     node.rotation = rotation;
@@ -212,6 +191,7 @@ function nodeTransform(d, dx = 0, dy = 0) {
 
 // === ВСПОМОГАТЕЛЬНЫЕ ===
 function getInitials(name) {
+  if (!name) return '?';
   const parts = name.split(' ').filter(Boolean);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return parts[0] ? parts[0][0].toUpperCase() : '?';
@@ -222,15 +202,9 @@ function getInitials(name) {
 // ============================================
 const IR = CONFIG.infiniteRoots;
 
-function randomFrom(arr, seed) {
-  const idx = Math.abs(Math.floor(hashNoise(seed, 17) * 10000)) % arr.length;
-  return arr[idx];
-}
-
+// Генерируем БЕЗЫМЯННОГО предка — только пол, дата, id
 function generateAncestor(childId, childBirth, childGeneration, side) {
   const gender = side === 'father' ? 'male' : 'female';
-  const firstName = randomFrom(gender === 'male' ? IR.namesMale : IR.namesFemale, childId + side);
-  const lastName = randomFrom(IR.surnames, childId + 'last' + side);
   const id = `gen_${childId}_${side}`;
 
   let birth = null;
@@ -247,7 +221,7 @@ function generateAncestor(childId, childBirth, childGeneration, side) {
 
   return {
     id,
-    name: `${lastName} ${firstName}`,
+    name: '',           // ← БЕЗ ИМЕНИ
     birth,
     gender,
     generation: childGeneration + 1,
@@ -274,20 +248,18 @@ function loadNextGeneration(datum) {
     return false;
   }
   if (datum._childrenLoaded) {
-    console.log('↻ Уже загружено:', datum.data.name);
     return false;
   }
 
-  // НЕ генерируем, если у узла УЖЕ есть дети (реальные)
+  // НЕ генерируем, если у узла УЖЕ есть дети
   if (datum.data.children && datum.data.children.length > 0) {
-    console.log('⏭ Узел уже имеет предков:', datum.data.name);
     return false;
   }
 
   const father = generateAncestor(datum.data.id, datum.data.birth, datum.depth, 'father');
   const mother = generateAncestor(datum.data.id, datum.data.birth, datum.depth, 'mother');
 
-  console.log('✨ Генерирую предков для', datum.data.name, '→', father.name, '+', mother.name);
+  console.log('✨ Генерирую предков для', datum.data.name || '(безымянный)');
 
   let targetInData = findInFamilyData(familyData, datum.data.id);
 
@@ -352,7 +324,6 @@ let autoLoadTimer = null;
 function scheduleAutoLoad() {
   clearTimeout(autoLoadTimer);
   autoLoadTimer = setTimeout(() => {
-    // Теперь ЛЮБОЙ узел без загруженных предков — кандидат
     const candidates = root.descendants()
       .filter(d => !d._childrenLoaded)
       .filter(d => !d.data.children || d.data.children.length === 0)
@@ -455,21 +426,25 @@ function renderTree(animateEntrance = false) {
     .attr('cy', 0)
     .attr('r', CONFIG.avatarRadius);
 
+  // Инициалы — только если есть имя, иначе "?"
   nodesEnter.append('text')
     .attr('class', 'avatar-text')
     .attr('x', avatarX)
     .attr('y', 0)
     .text(d => getInitials(d.data.name));
 
+  // Имя — только если есть
   nodesEnter.append('text')
     .attr('class', 'card-name')
     .attr('x', avatarX + 26)
     .attr('y', -6)
     .text(d => {
+      if (!d.data.name) return '';          // ← пусто для сгенерированных
       const parts = d.data.name.split(' ');
       return parts.length > 1 ? `${parts[0]} ${parts[1]}` : d.data.name;
     });
 
+  // Дата
   nodesEnter.append('text')
     .attr('class', 'card-date')
     .attr('x', avatarX + 26)
@@ -564,7 +539,6 @@ function attachNodeHandlers(selection) {
 
     animateAncestorWave(d);
 
-    // ГЕНЕРИРУЕМ ОТ ЛЮБОГО УЗЛА (если у него ещё нет детей)
     if (CONFIG.infiniteRoots.enabled && !d._childrenLoaded) {
       setTimeout(() => manualLoad(d), 400);
     }
@@ -577,10 +551,12 @@ function attachNodeHandlers(selection) {
       ? '<div class="row" style="color:#a06bff">✨ Восстановлено по роду</div>'
       : '';
 
+    const displayName = d.data.name || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
+
     tooltip
       .style('opacity', 1)
       .html(`
-        <strong>${d.data.name}</strong>
+        <strong>${displayName}</strong>
         <div class="row">Дата рождения: <span>${d.data.birth || 'неизвестна'}</span></div>
         <div class="row">Поколение: <span>${genLabel}</span></div>
         <div class="row">Пол: <span>${genderLabel}</span></div>
