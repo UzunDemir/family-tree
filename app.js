@@ -167,7 +167,7 @@ function adjustAllPositions(root) {
     // ВАЖНО: минус — уводит визуально ВВЕРХ по экрану
     // (offsetY компенсирует инверсию D3)
     node.x = parent.x + baseSideOffset + sideJitter;
-    node.y = parent.y - GENERATION_STEP_Y + yJitter;
+    node.y = parent.y + GENERATION_STEP_Y + yJitter;
     node.rotation = rotation;
 
     node.xIdeal = node.x;
