@@ -5,7 +5,7 @@
  * Правила:
  *   - ЛЮБОЙ узел ВСЕГДА ниже родителя
  *   - Сгенерированные узлы БЕЗ имён
- *   - Jitter: по X НЕТ, по Y только вниз
+ *   - Связи — вертикальные S-кривые, без растяжения в стороны
  *   - Карточки НЕ наезжают друг на друга
  *   - Яркие пульсы для реальных, тусклые для сгенерированных
  *   - Кнопка «Сброс рода» — медленное исчезновение
@@ -109,7 +109,6 @@ const zoom = d3.zoom()
 svg.call(zoom);
 
 // === НАЧАЛЬНЫЙ ЗУМ ===
-// На мобильном — чуть отдаляем, чтобы дерево влезло
 const initialScale = IS_MOBILE ? 0.7 : 1;
 const initialTX = IS_MOBILE ? width * 0.15 : 0;
 const initialTY = IS_MOBILE ? height * 0.05 : 0;
@@ -153,8 +152,10 @@ const JITTER = {
 
 const GENERATION_STEP_Y = IS_MOBILE ? 70 : 90;
 const GENERATION_STEP_Y_MIN = IS_MOBILE ? 60 : 80;
-const PARENT_SIDE_OFFSET = IS_MOBILE ? 25 : 35;
+// ⬇️ УМЕНЬШЕНО — сгенерированные стоят почти под родителем
+const PARENT_SIDE_OFFSET = IS_MOBILE ? 12 : 15;
 
+// ⬇️ ОБНОВЛЕНО — разрешаем сгенерированным стоять близко
 function enforceNoOverlapX(root) {
   const allNodes = root.descendants();
 
@@ -170,10 +171,15 @@ function enforceNoOverlapX(root) {
     for (let i = 1; i < nodesAtDepth.length; i++) {
       const prev = nodesAtDepth[i - 1];
       const curr = nodesAtDepth[i];
+
+      // Оба сгенерированы — разрешаем стоять в 30px друг от друга
+      const bothGenerated = prev.data.isGenerated && curr.data.isGenerated;
+      const minDx = bothGenerated ? 30 : CARD_MIN_DX;
+
       const dx = curr.x - prev.x;
 
-      if (dx < CARD_MIN_DX) {
-        const push = (CARD_MIN_DX - dx) / 2 + 1;
+      if (dx < minDx) {
+        const push = (minDx - dx) / 2 + 1;
         prev.x -= push;
         curr.x += push;
       }
@@ -182,8 +188,11 @@ function enforceNoOverlapX(root) {
     for (let i = 1; i < nodesAtDepth.length; i++) {
       const prev = nodesAtDepth[i - 1];
       const curr = nodesAtDepth[i];
-      if (curr.x - prev.x < CARD_MIN_DX) {
-        curr.x = prev.x + CARD_MIN_DX;
+      const bothGenerated = prev.data.isGenerated && curr.data.isGenerated;
+      const minDx = bothGenerated ? 30 : CARD_MIN_DX;
+
+      if (curr.x - prev.x < minDx) {
+        curr.x = prev.x + minDx;
       }
     }
   });
@@ -223,7 +232,6 @@ function adjustAllPositions(root) {
 
     const yJitter = Math.abs(hashNoise(node.data.id, 12)) * (IS_MOBILE ? 12 : 20);
 
-    // Адаптивный шаг — чем глубже, тем компактнее
     const depthFactor = Math.max(0.4, 1 - node.depth * 0.08);
     const step = GENERATION_STEP_Y * depthFactor;
 
@@ -256,20 +264,18 @@ function getGenerationStyle(generation) {
   };
 }
 
-// === СВЯЗИ ===
+// === СВЯЗИ — ВЕРТИКАЛЬНЫЕ S-КРИВЫЕ, БЕЗ РАСТЯЖЕНИЯ В СТОРОНЫ ===
 function organicLink(d) {
   const sx = d.source.x + offsetX;
   const sy = d.source.y + offsetY;
   const tx = d.target.x + offsetX;
   const ty = d.target.y + offsetY;
 
-  const isGenerated = d.target.data.isGenerated;
-  const bendFactor = isGenerated ? 0.15 : 0.25;
-
+  // Изгиб по вертикали, БЕЗ бокового сдвига
   const midY = (sy + ty) / 2;
-  const bend = (tx - sx) * bendFactor;
 
-  return `M${sx},${sy} C${sx + bend},${midY} ${tx - bend},${midY} ${tx},${ty}`;
+  // Кривая начинается и приходит вертикально
+  return `M${sx},${sy} C${sx},${midY} ${tx},${midY} ${tx},${ty}`;
 }
 
 // === TRANSFORM ===
@@ -651,7 +657,6 @@ if (CONFIG.pulse.enabled) {
 
 // === ОБРАБОТЧИКИ ===
 function attachNodeHandlers(selection) {
-  // Hover — только на десктопе
   if (!IS_MOBILE) {
     selection.on('mouseenter', (event, d) => {
       spawnParticles(d, CONFIG.particles.onHover);
@@ -692,7 +697,6 @@ function attachNodeHandlers(selection) {
     });
   }
 
-  // Click — на всех устройствах
   selection.on('click', (event, d) => {
     event.stopPropagation();
 
@@ -706,7 +710,6 @@ function attachNodeHandlers(selection) {
 
     animateAncestorWave(d);
 
-    // На мобильном — показываем тултип
     if (IS_MOBILE) {
       showMobileTooltip(d, event);
     }
