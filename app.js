@@ -5,8 +5,9 @@
  *   - ЛЮБОЙ узел ВСЕГДА ниже родителя
  *   - Сгенерированные узлы БЕЗ имён
  *   - Jitter: по X НЕТ, по Y только вниз
- *   - Карточки НЕ наезжают друг на друга (жёсткое раздвигание по X)
- *   - Дыхание только вниз
+ *   - Карточки НЕ наезжают друг на друга
+ *   - Яркие пульсы для реальных предков, тусклые для сгенерированных
+ *   - Кнопка «Сброс рода» — плавное удаление сгенерированных
  */
 
 // === КОНФИГУРАЦИЯ ===
@@ -89,16 +90,13 @@ svg.call(zoom);
 // === ПОСТРОЕНИЕ ===
 let root = d3.hierarchy(buildHierarchy(familyData));
 
-// Шаг между карточками по X — жёсткий
-const CARD_MIN_DX = CONFIG.cardWidth + 40;   // 180px
-const CARD_MIN_DY = CONFIG.cardHeight + 30;  // 86px
+const CARD_MIN_DX = CONFIG.cardWidth + 40;
+const CARD_MIN_DY = CONFIG.cardHeight + 30;
 
-// Размер дерева подстраиваем под ширину экрана и число листьев
 const treeLayout = d3.tree()
   .size([width * 0.95, height * 0.7])
   .separation((a, b) => {
     if (a.parent === b.parent) {
-      // Соседи — считаем через CARD_MIN_DX / ширину
       return CARD_MIN_DX / (width * 0.95);
     }
     return (CARD_MIN_DX * 1.4) / (width * 0.95);
@@ -117,7 +115,7 @@ function hashNoise(id, seed = 0) {
 
 // === JITTER (только Y и наклон) ===
 const JITTER = {
-  yByDepth:      [20, 30, 45, 60],   // только вниз
+  yByDepth:      [20, 30, 45, 60],
   rotateByDepth: [0, 1, 2, 3]
 };
 
@@ -125,11 +123,10 @@ const GENERATION_STEP_Y = 90;
 const GENERATION_STEP_Y_MIN = 80;
 const PARENT_SIDE_OFFSET = 35;
 
-// Жёсткое раздвигание по X на одном уровне
+// Жёсткое раздвигание по X
 function enforceNoOverlapX(root) {
   const allNodes = root.descendants();
 
-  // Группируем по глубине
   const byDepth = {};
   allNodes.forEach(d => {
     if (!byDepth[d.depth]) byDepth[d.depth] = [];
@@ -137,10 +134,8 @@ function enforceNoOverlapX(root) {
   });
 
   Object.values(byDepth).forEach(nodesAtDepth => {
-    // Сортируем по X
     nodesAtDepth.sort((a, b) => a.x - b.x);
 
-    // Раздвигаем от центра наружу
     for (let i = 1; i < nodesAtDepth.length; i++) {
       const prev = nodesAtDepth[i - 1];
       const curr = nodesAtDepth[i];
@@ -153,7 +148,6 @@ function enforceNoOverlapX(root) {
       }
     }
 
-    // Ещё раз, чтобы всё гарантированно разъехалось
     for (let i = 1; i < nodesAtDepth.length; i++) {
       const prev = nodesAtDepth[i - 1];
       const curr = nodesAtDepth[i];
@@ -165,7 +159,7 @@ function enforceNoOverlapX(root) {
 }
 
 function adjustAllPositions(root) {
-  // === 1. РЕАЛЬНЫЕ ПРЕДКИ ===
+  // 1. Реальные предки
   const realNodes = root.descendants()
     .filter(d => !d.data.isGenerated)
     .sort((a, b) => a.depth - b.depth);
@@ -173,22 +167,19 @@ function adjustAllPositions(root) {
   realNodes.forEach(node => {
     const depth = Math.min(node.depth, JITTER.yByDepth.length - 1);
 
-    // Только Y jitter, только вниз
     const yJitter = Math.abs(hashNoise(node.data.id, 2)) * JITTER.yByDepth[depth];
     node.y += yJitter;
 
-    // Наклон
     const rotDepth = Math.min(node.depth, JITTER.rotateByDepth.length - 1);
     node.rotation = hashNoise(node.data.id, 3) * JITTER.rotateByDepth[rotDepth];
 
-    // Ребёнок всегда ниже родителя
     if (node.parent) {
       const minY = node.parent.y + GENERATION_STEP_Y_MIN;
       if (node.y < minY) node.y = minY;
     }
   });
 
-  // === 2. СГЕНЕРИРОВАННЫЕ ===
+  // 2. Сгенерированные
   const generated = root.descendants()
     .filter(d => d.data.isGenerated)
     .sort((a, b) => a.depth - b.depth);
@@ -208,11 +199,10 @@ function adjustAllPositions(root) {
     node.rotation = hashNoise(node.data.id, 13) * 3;
   });
 
-  // === 3. ЖЁСТКОЕ РАЗДВИГАНИЕ ПО X ===
+  // 3. Жёсткое раздвигание по X
   enforceNoOverlapX(root);
 
-  // === 4. ФИНАЛЬНАЯ ПРОВЕРКА ВЕРТИКАЛИ ===
-  // После раздвигания по X — снова убеждаемся, что дети ниже родителей
+  // 4. Финальная вертикаль
   root.descendants()
     .sort((a, b) => a.depth - b.depth)
     .forEach(node => {
@@ -309,10 +299,7 @@ function findInFamilyData(node, id) {
 }
 
 function loadNextGeneration(datum) {
-  if (datum.depth >= IR.maxGenerations) {
-    console.log('⛔ Достигнут максимум поколений');
-    return false;
-  }
+  if (datum.depth >= IR.maxGenerations) return false;
   if (datum._childrenLoaded) return false;
 
   if (datum.data.children && datum.data.children.length > 0) {
@@ -357,7 +344,6 @@ function loadNextGeneration(datum) {
     return true;
   }
 
-  console.warn('⚠️ Не найден в familyData:', datum.data.id);
   return false;
 }
 
@@ -401,7 +387,6 @@ function scheduleAutoLoad() {
     }
 
     if (loaded > 0) {
-      console.log(`🌌 Загружено ${loaded} новых предков`);
       rebuildAndRender();
       showDepthStatus();
     }
@@ -433,6 +418,7 @@ let nodes = nodeLayer.selectAll('.node');
 let pulses = pulseLayer.selectAll('.pulse');
 
 function renderTree(animateEntrance = false) {
+  // Связи
   links = linkLayer.selectAll('.link')
     .data(root.links(), d => d.target.data.id);
 
@@ -458,6 +444,7 @@ function renderTree(animateEntrance = false) {
   links = linksEnter.merge(links);
   links.attr('d', organicLink);
 
+  // Узлы
   nodes = nodeLayer.selectAll('.node')
     .data(root.descendants(), d => d.data.id);
 
@@ -535,11 +522,25 @@ function renderPulses() {
 
   pulses = pulses.enter()
     .append('circle')
-    .attr('class', 'pulse')
-    .attr('r', CONFIG.pulse.radius)
-    .attr('fill', d => d.target.data.gender === 'male' ? '#4a9eff' : '#ff6bb0')
+    .attr('class', d => {
+      const isReal = !d.target.data.isGenerated;
+      return isReal ? 'pulse real' : 'pulse generated';
+    })
+    .attr('r', d => {
+      return d.target.data.isGenerated
+        ? CONFIG.pulse.radius
+        : CONFIG.pulse.radius * 1.8;
+    })
+    .attr('fill', d => {
+      if (d.target.data.isGenerated) return '#6b6b8a';
+      return d.target.data.gender === 'male' ? '#4a9eff' : '#ff6bb0';
+    })
     .attr('opacity', 0)
-    .attr('filter', CONFIG.pulse.glow ? 'url(#glow)' : null)
+    .attr('filter', d => {
+      return d.target.data.isGenerated
+        ? null
+        : (CONFIG.pulse.glow ? 'url(#glow)' : null);
+    })
     .merge(pulses);
 }
 
@@ -565,13 +566,20 @@ if (CONFIG.pulse.enabled) {
 
       const totalLength = path.getTotalLength();
       const baseDelay = (hashNoise(d.target.data.id, 42) + 1) * 1000;
-      const t = ((Date.now() + baseDelay) % CONFIG.pulse.speed) / CONFIG.pulse.speed;
+
+      const isReal = !d.target.data.isGenerated;
+      const speed = isReal ? CONFIG.pulse.speed * 0.6 : CONFIG.pulse.speed;
+
+      const t = ((Date.now() + baseDelay) % speed) / speed;
       const point = path.getPointAtLength(t * totalLength);
+
+      const maxOpacity = isReal ? 1.0 : 0.5;
+      const opacity = Math.sin(t * Math.PI) * maxOpacity;
 
       pulse
         .attr('cx', point.x)
         .attr('cy', point.y)
-        .attr('opacity', Math.sin(t * Math.PI) * 0.9);
+        .attr('opacity', opacity);
     });
     requestAnimationFrame(animatePulses);
   }
@@ -619,7 +627,7 @@ function attachNodeHandlers(selection) {
         <div class="row">Дата рождения: <span>${d.data.birth || 'неизвестна'}</span></div>
         <div class="row">Поколение: <span>${genLabel}</span></div>
         <div class="row">Пол: <span>${genderLabel}</span></div>
-        ${d.children ? `<div class="row">Детей в древе: <span>${d.children.length}</span></div>` : ''}
+        ${d.children ? `<div class="row">Предков выше: <span>${d.children.length}</span></div>` : ''}
         ${generatedLabel}
       `)
       .style('left', (event.pageX + 15) + 'px')
@@ -717,6 +725,79 @@ function resetHighlight() {
     });
 }
 
+// === УДАЛЕНИЕ СГЕНЕРИРОВАННЫХ ПРЕДКОВ ===
+function clearGeneratedAncestors() {
+  console.log('🌫 Начинаю удаление сгенерированных предков...');
+
+  const generatedNodes = nodeLayer.selectAll('.node')
+    .filter(d => d.data.isGenerated);
+
+  const generatedLinks = linkLayer.selectAll('.link')
+    .filter(d => d.target.data.isGenerated);
+
+  const generatedPulses = pulseLayer.selectAll('.pulse')
+    .filter(d => d.target.data.isGenerated);
+
+  if (generatedNodes.empty()) {
+    console.log('ℹ️ Нет сгенерированных предков для удаления');
+    return;
+  }
+
+  // Пульсы — гаснут
+  generatedPulses
+    .transition()
+    .duration(2000)
+    .ease(d3.easeCubicOut)
+    .attr('opacity', 0)
+    .remove();
+
+  // Связи — растворяются
+  generatedLinks
+    .transition()
+    .duration(2000)
+    .ease(d3.easeCubicOut)
+    .style('opacity', 0)
+    .attr('stroke-opacity', 0)
+    .remove();
+
+  // Узлы — сжимаются и исчезают
+  generatedNodes
+    .transition()
+    .duration(2000)
+    .ease(d3.easeCubicOut)
+    .style('opacity', 0)
+    .attr('transform', function(d) {
+      const { scale } = getGenerationStyle(d.depth);
+      const rot = d.rotation || 0;
+      // Сжимаем к 0
+      return `translate(${d.x + offsetX}, ${d.y + offsetY}) rotate(${rot}) scale(${scale * 0.2})`;
+    })
+    .remove();
+
+  // Через 2.1 сек — чистим familyData и пересобираем
+  setTimeout(() => {
+    function cleanNode(node) {
+      if (!node.children || node.children.length === 0) return;
+      node.children = node.children.filter(c => !c.isGenerated);
+      node.children.forEach(cleanNode);
+    }
+
+    (familyData.parents || []).forEach(cleanNode);
+    (familyData.grandparents || []).forEach(cleanNode);
+    (familyData.greatGrandparents || []).forEach(cleanNode);
+
+    const newHierarchyData = buildHierarchy(familyData);
+    const newRoot = d3.hierarchy(newHierarchyData);
+    treeLayout(newRoot);
+    adjustAllPositions(newRoot);
+    root = newRoot;
+    renderTree(true);
+
+    console.log('✅ Все сгенерированные предки удалены');
+    showDepthStatus();
+  }, 2100);
+}
+
 // === ПЕРВИЧНЫЙ РЕНДЕР ===
 renderTree(true);
 
@@ -734,6 +815,11 @@ document.getElementById('btn-reset').addEventListener('click', (e) => {
   svg.transition().duration(CONFIG.duration.zoom)
     .call(zoom.transform, d3.zoomIdentity);
   resetHighlight();
+});
+
+document.getElementById('btn-clear-generated').addEventListener('click', (e) => {
+  e.stopPropagation();
+  clearGeneratedAncestors();
 });
 
 document.getElementById('btn-zoom-in').addEventListener('click', (e) => {
@@ -805,9 +891,7 @@ if (CONFIG.breathing.enabled) {
         const phase = (hashNoise(d.data.id, 9) + 1) * Math.PI;
         const t = (now - startTime) / dur + phase;
 
-        // X — маленькое (чтобы не наезжали)
         const dx = Math.sin(t) * Math.min(finalAmp, 3);
-        // Y — только вниз
         const dy = Math.abs(Math.cos(t * 0.7)) * Math.min(finalAmp, 3);
 
         return nodeTransform(d, dx, dy);
