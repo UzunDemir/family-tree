@@ -1,6 +1,14 @@
 /**
  * Семейное древо Узун — D3.js рендер
- * Эффект «предки уходят в бесконечность» + «живое дыхание»
+ * 
+ * Эффекты:
+ *   - Предки уходят в бесконечность (opacity/scale по глубине)
+ *   - Неровное расположение узлов (jitter + наклон)
+ *   - Органические изогнутые связи
+ *   - Пульсирующие «энергетические» точки по связям
+ *   - Частицы при наведении на узел
+ *   - Волна по родословной при клике
+ *   - Мягкое дыхание дерева
  */
 
 // === КОНФИГУРАЦИЯ ===
@@ -10,7 +18,6 @@ const CONFIG = {
   avatarRadius: 18,
   maxGeneration: 3,
 
-  // Эффект бесконечности
   infinity: {
     minOpacity: 0.25,
     minScale: 0.55,
@@ -18,20 +25,36 @@ const CONFIG = {
     scaleFalloff: 0.45
   },
 
-  // Анимации
   duration: {
     zoom: 750,
     highlight: 300,
     entrance: 600
   },
 
-  // «Дыхание» узлов
   breathing: {
     enabled: true,
-    baseAmp: 6,          // амплитуда для корня (px)
-    ampPerDepth: 4,      // прибавка за поколение
-    minDuration: 3000,   // мс на цикл (быстро)
-    maxDuration: 6000    // мс на цикл (медленно)
+    baseAmp: 4,
+    ampPerDepth: 3,
+    minDuration: 4000,
+    maxDuration: 7000
+  },
+
+  pulse: {
+    enabled: true,
+    speed: 4000,       // мс на полный пробег
+    radius: 3,
+    glow: true
+  },
+
+  particles: {
+    enabled: true,
+    onHover: 8,
+    onWave: 6
+  },
+
+  wave: {
+    stepDelay: 180,    // мс между узлами
+    duration: 400
   }
 };
 
@@ -46,9 +69,22 @@ const svg = d3.select('#tree-container')
   .attr('width', width)
   .attr('height', height);
 
+// Слои: свечение → связи → пульсы → узлы
+const defs = svg.append('defs');
+const glowFilter = defs.append('filter')
+  .attr('id', 'glow')
+  .attr('x', '-50%').attr('y', '-50%')
+  .attr('width', '200%').attr('height', '200%');
+glowFilter.append('feGaussianBlur').attr('stdDeviation', '3').attr('result', 'blur');
+const feMerge = glowFilter.append('feMerge');
+feMerge.append('feMergeNode').attr('in', 'blur');
+feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
 const g = svg.append('g').attr('class', 'main-group');
-const linkLayer = g.append('g').attr('class', 'links-layer');
-const nodeLayer = g.append('g').attr('class', 'nodes-layer');
+const linkLayer   = g.append('g').attr('class', 'links-layer');
+const pulseLayer  = g.append('g').attr('class', 'pulse-layer');
+const nodeLayer   = g.append('g').attr('class', 'nodes-layer');
+const particleLayer = g.append('g').attr('class', 'particle-layer');
 
 const offsetX = width / 2;
 const offsetY = height * 0.15;
@@ -72,7 +108,7 @@ const treeLayout = d3.tree()
 
 treeLayout(root);
 
-// === НЕРОВНОЕ РАСПОЛОЖЕНИЕ УЗЛОВ ===
+// === ДЕТЕРМИНИРОВАННЫЙ ШУМ ===
 function hashNoise(id, seed = 0) {
   let h = seed;
   for (let i = 0; i < id.length; i++) {
@@ -81,6 +117,7 @@ function hashNoise(id, seed = 0) {
   return ((h % 1000) / 1000) * 2 - 1;
 }
 
+// === НЕРОВНОЕ РАСПОЛОЖЕНИЕ ===
 const JITTER = {
   xByDepth:      [20, 35, 55, 80],
   yByDepth:      [10, 20, 35, 55],
@@ -97,7 +134,6 @@ root.descendants().forEach(d => {
   d.y += hashNoise(d.data.id, 2) * JITTER.yByDepth[depth];
   d.rotation = hashNoise(d.data.id, 3) * JITTER.rotateByDepth[depth];
 
-  // Предки «плывут вверх»
   if (d.depth >= 2) {
     d.y -= (d.depth - 1) * 30;
   }
@@ -114,7 +150,7 @@ function getGenerationStyle(generation) {
   };
 }
 
-// === СВЯЗИ (органические кривые) ===
+// === СВЯЗИ (органические) ===
 function organicLink(d) {
   const sx = d.source.x + offsetX;
   const sy = d.source.y + offsetY;
@@ -151,23 +187,20 @@ const nodes = nodeLayer.selectAll('.node')
   .attr('data-id', d => d.data.id)
   .style('opacity', 0);
 
-// Единая функция сборки transform
 function nodeTransform(d, dx = 0, dy = 0) {
   const { scale } = getGenerationStyle(d.depth);
   const rot = d.rotation || 0;
   return `translate(${d.x + offsetX + dx}, ${d.y + offsetY + dy}) rotate(${rot}) scale(${scale})`;
 }
 
-// Первичная установка позиций
 nodes.attr('transform', d => nodeTransform(d));
 
-// Плавное появление
 nodes.transition()
   .duration(CONFIG.duration.entrance)
   .delay(d => d.depth * 150)
   .style('opacity', d => getGenerationStyle(d.depth).opacity);
 
-// --- Содержимое карточки ---
+// --- Карточка ---
 nodes.append('rect')
   .attr('class', 'card-bg')
   .attr('x', -CONFIG.cardWidth / 2)
@@ -213,43 +246,12 @@ function getInitials(name) {
 }
 
 // === ПОДСВЕТКА ===
-function highlightBranch(node) {
-  nodeLayer.selectAll('.card-bg')
-    .classed('highlighted', false)
-    .classed('root-highlighted', false);
-
-  linkLayer.selectAll('.link')
-    .classed('highlighted', false)
-    .classed('dimmed', false);
-
-  const ancestorIds = new Set(node.ancestors().map(a => a.data.id));
-  const rootId = root.data.id;
-
-  nodeLayer.selectAll('.node')
-    .filter(d => ancestorIds.has(d.data.id))
-    .select('.card-bg')
-    .classed('highlighted', d => d.data.id !== rootId)
-    .classed('root-highlighted', d => d.data.id === rootId);
-
-  linkLayer.selectAll('.link')
-    .filter(d => ancestorIds.has(d.target.data.id))
-    .classed('highlighted', true);
-
-  linkLayer.selectAll('.link')
-    .filter(d => !ancestorIds.has(d.target.data.id))
-    .classed('dimmed', true);
-
-  nodeLayer.selectAll('.node')
-    .filter(d => !ancestorIds.has(d.data.id))
-    .select('.card-bg')
-    .attr('opacity', 0.3);
-}
-
 function resetHighlight() {
   nodeLayer.selectAll('.card-bg')
     .classed('highlighted', false)
     .classed('root-highlighted', false)
-    .attr('opacity', 1);
+    .attr('opacity', 1)
+    .style('filter', null);
 
   linkLayer.selectAll('.link')
     .classed('highlighted', false)
@@ -260,7 +262,109 @@ function resetHighlight() {
     });
 }
 
+// === ЧАСТИЦЫ ===
+function spawnParticles(d, count = CONFIG.particles.onHover) {
+  if (!CONFIG.particles.enabled) return;
+
+  const baseX = d.x + offsetX;
+  const baseY = d.y + offsetY;
+  const color = d.data.gender === 'male' ? '#4a9eff' : '#ff6bb0';
+
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
+    const dist = 50 + Math.random() * 50;
+
+    particleLayer.append('circle')
+      .attr('cx', baseX)
+      .attr('cy', baseY)
+      .attr('r', 1.5 + Math.random() * 2)
+      .attr('fill', color)
+      .attr('filter', 'url(#glow)')
+      .attr('opacity', 0.9)
+      .transition()
+      .duration(700 + Math.random() * 500)
+      .ease(d3.easeCubicOut)
+      .attr('cx', baseX + Math.cos(angle) * dist)
+      .attr('cy', baseY + Math.sin(angle) * dist)
+      .attr('r', 0)
+      .attr('opacity', 0)
+      .remove();
+  }
+}
+
+// === ВОЛНА ПО РОДОСЛОВНОЙ ===
+function animateAncestorWave(node) {
+  const ancestors = node.ancestors().reverse(); // от корня к узлу
+
+  nodeLayer.selectAll('.card-bg')
+    .classed('highlighted', false)
+    .classed('root-highlighted', false);
+
+  ancestors.forEach((ancestor, i) => {
+    setTimeout(() => {
+      const isRoot = ancestor.data.id === root.data.id;
+
+      nodeLayer.selectAll('.node')
+        .filter(d => d.data.id === ancestor.data.id)
+        .select('.card-bg')
+        .classed('highlighted', !isRoot)
+        .classed('root-highlighted', isRoot)
+        .style('filter', 'drop-shadow(0 0 14px rgba(74,158,255,0.9))');
+
+      // Частицы на каждом предке
+      spawnParticles(ancestor, CONFIG.particles.onWave);
+
+      // Снять свечение через время
+      setTimeout(() => {
+        nodeLayer.selectAll('.node')
+          .filter(d => d.data.id === ancestor.data.id)
+          .select('.card-bg')
+          .style('filter', null);
+      }, CONFIG.wave.duration + 200);
+    }, i * CONFIG.wave.stepDelay);
+  });
+
+  // Подсветка связей вдоль пути
+  const ancestorIds = new Set(ancestors.map(a => a.data.id));
+  linkLayer.selectAll('.link')
+    .classed('highlighted', d => ancestorIds.has(d.target.data.id))
+    .classed('dimmed', d => !ancestorIds.has(d.target.data.id));
+}
+
+// === ПУЛЬСИРУЮЩИЕ СВЯЗИ ===
+if (CONFIG.pulse.enabled) {
+  links.each(function(d) {
+    const path = d3.select(this);
+    const totalLength = path.node().getTotalLength();
+    const baseDelay = (hashNoise(d.target.data.id, 42) + 1) * 1000;
+    const color = d.target.data.gender === 'male' ? '#4a9eff' : '#ff6bb0';
+
+    const pulse = pulseLayer.append('circle')
+      .attr('r', CONFIG.pulse.radius)
+      .attr('fill', color)
+      .attr('opacity', 0)
+      .attr('filter', CONFIG.pulse.glow ? 'url(#glow)' : null);
+
+    function animate() {
+      const t = ((Date.now() + baseDelay) % CONFIG.pulse.speed) / CONFIG.pulse.speed;
+      const point = path.node().getPointAtLength(t * totalLength);
+
+      pulse
+        .attr('cx', point.x)
+        .attr('cy', point.y)
+        .attr('opacity', Math.sin(t * Math.PI) * 0.9);
+
+      requestAnimationFrame(animate);
+    }
+    animate();
+  });
+}
+
 // === ИНТЕРАКТИВ ===
+nodes.on('mouseenter', (event, d) => {
+  spawnParticles(d, CONFIG.particles.onHover);
+});
+
 nodes.on('click', (event, d) => {
   event.stopPropagation();
 
@@ -272,7 +376,7 @@ nodes.on('click', (event, d) => {
     .duration(CONFIG.duration.zoom)
     .call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(scale));
 
-  highlightBranch(d);
+  animateAncestorWave(d);
 });
 
 nodes.on('mouseover', (event, d) => {
@@ -334,6 +438,7 @@ document.getElementById('btn-toggle-lines').addEventListener('click', function(e
   e.stopPropagation();
   const hidden = linkLayer.style('display') === 'none';
   linkLayer.style('display', hidden ? 'block' : 'none');
+  pulseLayer.style('display', hidden ? 'block' : 'none');
   this.classList.toggle('active', hidden);
 });
 
@@ -364,19 +469,17 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// === ЖИВОЕ ДЫХАНИЕ ===
+// === ДЫХАНИЕ ===
 if (CONFIG.breathing.enabled) {
   const startTime = Date.now();
   let zoomActive = false;
   let entranceDone = false;
 
-  // Зум временно замораживает дыхание
   svg.on('mousedown.breathing', () => { zoomActive = true; });
   svg.on('mouseup.breathing',   () => { zoomActive = false; });
   svg.on('mouseleave.breathing',() => { zoomActive = false; });
   svg.on('touchend.breathing',  () => { zoomActive = false; });
 
-  // Ждём завершения анимации появления
   setTimeout(() => { entranceDone = true; }, CONFIG.duration.entrance + 200);
 
   function breathe() {
@@ -386,16 +489,13 @@ if (CONFIG.breathing.enabled) {
       nodes.attr('transform', function(d) {
         const amp = CONFIG.breathing.baseAmp + d.depth * CONFIG.breathing.ampPerDepth;
 
-        // Детерминированный период для каждого узла
         const dur = CONFIG.breathing.minDuration +
                     (hashNoise(d.data.id, 7) + 1) / 2 *
                     (CONFIG.breathing.maxDuration - CONFIG.breathing.minDuration);
 
-        // Детерминированная фаза
         const phase = (hashNoise(d.data.id, 9) + 1) * Math.PI;
         const t = (now - startTime) / dur + phase;
 
-        // Два разных ритма — «плавающее» движение
         const dx = Math.sin(t) * amp;
         const dy = Math.cos(t * 0.7) * amp * 0.6;
 
