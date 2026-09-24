@@ -195,6 +195,20 @@ const links = linkLayer.selectAll('.link')
 
 
 // === РИСУЕМ УЗЛЫ ===
+// const nodes = nodeLayer.selectAll('.node')
+//   .data(root.descendants())
+//   .enter()
+//   .append('g')
+//   .attr('class', 'node')
+//   .attr('data-id', d => d.data.id)
+//   .attr('transform', d => {
+//     const { scale } = getGenerationStyle(d.depth);
+//     return `translate(${d.x + offsetX}, ${d.y + offsetY}) scale(${scale})`;
+//   })
+//   .style('opacity', 0)
+//   .style('animation-delay', d => `${d.depth * 150}ms`);
+
+
 const nodes = nodeLayer.selectAll('.node')
   .data(root.descendants())
   .enter()
@@ -203,10 +217,12 @@ const nodes = nodeLayer.selectAll('.node')
   .attr('data-id', d => d.data.id)
   .attr('transform', d => {
     const { scale } = getGenerationStyle(d.depth);
-    return `translate(${d.x + offsetX}, ${d.y + offsetY}) scale(${scale})`;
+    const rot = d.rotation || 0;
+    return `translate(${d.x + offsetX}, ${d.y + offsetY}) rotate(${rot}) scale(${scale})`;
   })
   .style('opacity', 0)
   .style('animation-delay', d => `${d.depth * 150}ms`);
+
 
 // Плавное появление
 nodes.transition()
