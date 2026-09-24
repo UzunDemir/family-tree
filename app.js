@@ -63,14 +63,71 @@ svg.call(zoom);
 svg.call(zoom.transform, d3.zoomIdentity.translate(0, 0));
 
 // === ПОСТРОЕНИЕ ДЕРЕВА ===
+// const hierarchyData = buildHierarchy(familyData);
+// const root = d3.hierarchy(hierarchyData);
+
+// const treeLayout = d3.tree()
+//   .size([width * 0.85, height * 0.7])
+//   .separation((a, b) => (a.parent === b.parent ? 1.4 : 2.2));
+
+// treeLayout(root);
+
 const hierarchyData = buildHierarchy(familyData);
 const root = d3.hierarchy(hierarchyData);
 
+// === БАЗОВЫЙ LAYOUT ===
 const treeLayout = d3.tree()
   .size([width * 0.85, height * 0.7])
   .separation((a, b) => (a.parent === b.parent ? 1.4 : 2.2));
 
 treeLayout(root);
+
+// === НЕРОВНОЕ РАСПОЛОЖЕНИЕ УЗЛОВ ===
+// Детерминированный «шум» — чтобы при перезагрузке не прыгало
+function hashNoise(id, seed = 0) {
+  let h = seed;
+  for (let i = 0; i < id.length; i++) {
+    h = (h * 31 + id.charCodeAt(i)) | 0;
+  }
+  // Преобразуем в диапазон [-1, 1]
+  return ((h % 1000) / 1000) * 2 - 1;
+}
+
+// Настраиваем «живость» по поколениям
+const JITTER = {
+  // чем глубже поколение, тем сильнее разброс
+  xByDepth:   [20, 35, 55, 80],   // горизонтальный сдвиг (px)
+  yByDepth:   [10, 20, 35, 55],   // вертикальный сдвиг (px)
+  rotateByDepth: [0, 1.5, 3, 5]   // наклон (градусы)
+};
+
+// Применяем сдвиг к каждой ноде
+root.descendants().forEach(d => {
+  const depth = Math.min(d.depth, JITTER.xByDepth.length - 1);
+
+  const jx = hashNoise(d.data.id, 1) * JITTER.xByDepth[depth];
+  const jy = hashNoise(d.data.id, 2) * JITTER.yByDepth[depth];
+  const jr = hashNoise(d.data.id, 3) * JITTER.rotateByDepth[depth];
+
+  // Сохраняем «идеальные» координаты (для связей)
+  d.xIdeal = d.x;
+  d.yIdeal = d.y;
+
+  // Смещаем
+  d.x = d.x + jx;
+  d.y = d.y + jy;
+  d.rotation = jr;
+});
+
+// Дополнительно: предки «плывут вверх» — чем глубже, тем выше
+root.descendants().forEach(d => {
+  if (d.depth >= 2) {
+    const lift = (d.depth - 1) * 30; // 2-е поколение: +30, 3-е: +60
+    d.y -= lift;
+  }
+});
+
+
 
 // === ЭФФЕКТ БЕСКОНЕЧНОСТИ ===
 function getGenerationStyle(generation) {
