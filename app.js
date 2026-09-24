@@ -120,7 +120,7 @@ const JITTER = {
 
 const GENERATION_STEP_Y = 55;         // было 90
 const GENERATION_STEP_Y_MIN = 50;     // было 80
-const PARENT_SIDE_OFFSET = 30;        // было 35
+const PARENT_SIDE_OFFSET = 10;        // было 35
 
 function enforceNoOverlapX(root) {
   const allNodes = root.descendants();
