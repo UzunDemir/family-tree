@@ -10,6 +10,7 @@ const CONFIG = {
   avatarRadius: 18,
   maxGeneration: 3,
 
+  // Эффект бесконечности
   infinity: {
     minOpacity: 0.25,
     minScale: 0.55,
@@ -17,6 +18,7 @@ const CONFIG = {
     scaleFalloff: 0.45
   },
 
+  // Анимации
   duration: {
     zoom: 750,
     highlight: 300,
@@ -26,10 +28,10 @@ const CONFIG = {
   // «Дыхание» узлов
   breathing: {
     enabled: true,
-    baseAmp: 2,        // минимальная амплитуда
-    ampPerDepth: 1.5,  // прибавка за поколение
-    minDuration: 4000, // мс на цикл
-    maxDuration: 7000
+    baseAmp: 6,          // амплитуда для корня (px)
+    ampPerDepth: 4,      // прибавка за поколение
+    minDuration: 3000,   // мс на цикл (быстро)
+    maxDuration: 6000    // мс на цикл (медленно)
   }
 };
 
@@ -70,7 +72,7 @@ const treeLayout = d3.tree()
 
 treeLayout(root);
 
-// === НЕРОВНОЕ РАСПОЛОЖЕНИЕ ===
+// === НЕРОВНОЕ РАСПОЛОЖЕНИЕ УЗЛОВ ===
 function hashNoise(id, seed = 0) {
   let h = seed;
   for (let i = 0; i < id.length; i++) {
@@ -112,7 +114,7 @@ function getGenerationStyle(generation) {
   };
 }
 
-// === СВЯЗИ (органические) ===
+// === СВЯЗИ (органические кривые) ===
 function organicLink(d) {
   const sx = d.source.x + offsetX;
   const sy = d.source.y + offsetY;
@@ -149,7 +151,7 @@ const nodes = nodeLayer.selectAll('.node')
   .attr('data-id', d => d.data.id)
   .style('opacity', 0);
 
-// Функция сборки transform (единая точка правды)
+// Единая функция сборки transform
 function nodeTransform(d, dx = 0, dy = 0) {
   const { scale } = getGenerationStyle(d.depth);
   const rot = d.rotation || 0;
@@ -362,30 +364,38 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// === ЖИВОЕ ДЫХАНИЕ (правильное) ===
+// === ЖИВОЕ ДЫХАНИЕ ===
 if (CONFIG.breathing.enabled) {
   const startTime = Date.now();
+  let zoomActive = false;
+  let entranceDone = false;
 
-  // Отключаем дыхание во время зума и появления
-  let breathingPaused = true;
-  setTimeout(() => { breathingPaused = false; }, CONFIG.duration.entrance + 500);
+  // Зум временно замораживает дыхание
+  svg.on('mousedown.breathing', () => { zoomActive = true; });
+  svg.on('mouseup.breathing',   () => { zoomActive = false; });
+  svg.on('mouseleave.breathing',() => { zoomActive = false; });
+  svg.on('touchend.breathing',  () => { zoomActive = false; });
 
-  svg.on('mousedown.breathing', () => { breathingPaused = true; });
-  svg.on('mouseup.breathing', () => { 
-    setTimeout(() => { breathingPaused = false; }, CONFIG.duration.zoom); 
-  });
+  // Ждём завершения анимации появления
+  setTimeout(() => { entranceDone = true; }, CONFIG.duration.entrance + 200);
 
   function breathe() {
-    if (!breathingPaused) {
+    if (entranceDone && !zoomActive) {
       const now = Date.now();
+
       nodes.attr('transform', function(d) {
         const amp = CONFIG.breathing.baseAmp + d.depth * CONFIG.breathing.ampPerDepth;
-        const dur = CONFIG.breathing.minDuration + 
-                    (hashNoise(d.data.id, 7) + 1) / 2 * 
-                    (CONFIG.breathing.maxDuration - CONFIG.breathing.minDuration);
-        const phase = (hashNoise(d.data.id, 9) + 1) * Math.PI;
-        const t = now / dur + phase;
 
+        // Детерминированный период для каждого узла
+        const dur = CONFIG.breathing.minDuration +
+                    (hashNoise(d.data.id, 7) + 1) / 2 *
+                    (CONFIG.breathing.maxDuration - CONFIG.breathing.minDuration);
+
+        // Детерминированная фаза
+        const phase = (hashNoise(d.data.id, 9) + 1) * Math.PI;
+        const t = (now - startTime) / dur + phase;
+
+        // Два разных ритма — «плавающее» движение
         const dx = Math.sin(t) * amp;
         const dy = Math.cos(t * 0.7) * amp * 0.6;
 
