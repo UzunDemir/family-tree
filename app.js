@@ -559,42 +559,6 @@ function renderTree(animateEntrance = false) {
     .style('font-size', FONT_AVATAR)
     .text(d => getInitials(d.data.name));
 
-  
-
-  node.append('text')
-    .attr('class', 'avatar-text')
-    .attr('x', avatarX)
-    .attr('y', 0)
-    .style('font-size', FONT_AVATAR)
-    .text(d => getInitials(d.data.name));
-
-  // Пробуем загрузить фото
-  const img = new Image();
-  img.onload = () => {
-    // Фото загрузилось — показываем его, скрываем инициалы
-    node.insert('image', ':first-child')
-      .attr('href', photoPath)
-      .attr('x', avatarX - AVATAR_R)
-      .attr('y', -AVATAR_R)
-      .attr('width', AVATAR_R * 2)
-      .attr('height', AVATAR_R * 2)
-      .attr('clip-path', `url(#${clipId})`)
-      .attr('preserveAspectRatio', 'xMidYMid slice');
-
-    node.select('.avatar-text').style('opacity', 0);
-    node.select('.avatar-circle').style('opacity', 0);
-  };
-  img.onerror = () => {
-    // Фото нет — оставляем инициалы
-    console.log(`ℹ️ Нет фото для ${d.data.name || d.data.id}`);
-  };
-  img.src = photoPath;
-});
-
- 
-
-  
-
   nodesEnter.append('text')
     .attr('class', 'card-name')
     .attr('x', avatarX + 26)
