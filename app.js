@@ -3,9 +3,10 @@
  * 
  * Правила:
  *   - ЛЮБОЙ узел (реальный или сгенерированный) ВСЕГДА ниже родителя
- *   - Сгенерированные узлы БЕЗ имён (только пол и дата)
- *   - Jitter: по X свободно, по Y только вниз, наклон свободно
- *   - Дыхание: по Y только вниз (не поднимает узел выше родителя)
+ *   - Сгенерированные узлы БЕЗ имён
+ *   - Jitter: по X свободно, по Y только вниз
+ *   - Карточки НЕ наезжают друг на друга
+ *   - Дыхание только вниз (не поднимает узел выше родителя)
  */
 
 // === КОНФИГУРАЦИЯ ===
@@ -101,26 +102,84 @@ function hashNoise(id, seed = 0) {
   for (let i = 0; i < id.length; i++) {
     h = (h * 31 + id.charCodeAt(i)) | 0;
   }
-  return ((h % 1000) / 1000) * 2 - 1;  // [-1, 1]
+  return ((h % 1000) / 1000) * 2 - 1;
 }
 
 // === НЕРОВНОЕ РАСПОЛОЖЕНИЕ ===
 const JITTER = {
   xByDepth:      [20, 35, 55, 80],
-  yByDepth:      [15, 25, 40, 55],   // разброс вниз
+  yByDepth:      [15, 25, 40, 55],
   rotateByDepth: [0, 1.5, 3, 5]
 };
 
-// Шаг для сгенерированных
 const GENERATION_STEP_Y = 90;
-// Минимальный шаг для реальных — гарантия, что ребёнок ниже родителя
 const GENERATION_STEP_Y_MIN = 80;
-// Боковое смещение отца/матери
 const PARENT_SIDE_OFFSET = 35;
+
+// Минимальные расстояния между карточками (анти-наезд)
+const CARD_MIN_DX = CONFIG.cardWidth + 30;   // 170px
+const CARD_MIN_DY = CONFIG.cardHeight + 40;  // 96px
+
+function resolveCollisions(root, iterations = 12) {
+  const allNodes = root.descendants();
+
+  for (let iter = 0; iter < iterations; iter++) {
+    let moved = false;
+
+    for (let i = 0; i < allNodes.length; i++) {
+      for (let j = i + 1; j < allNodes.length; j++) {
+        const a = allNodes[i];
+        const b = allNodes[j];
+
+        // Не раздвигаем прямых родителя и ребёнка — они связаны вертикально
+        if (a.parent === b || b.parent === a) continue;
+
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(dy);
+
+        // Пересечение по обеим осям?
+        if (absDx < CARD_MIN_DX && absDy < CARD_MIN_DY) {
+          moved = true;
+
+          const overlapX = CARD_MIN_DX - absDx;
+          const overlapY = CARD_MIN_DY - absDy;
+
+          // Раздвигаем по оси с меньшим пересечением
+          if (overlapX / CARD_MIN_DX < overlapY / CARD_MIN_DY) {
+            // Раздвигаем по X
+            const push = overlapX / 2 + 1;
+            const dir = dx >= 0 ? 1 : -1;
+            a.x -= dir * push;
+            b.x += dir * push;
+          } else {
+            // Раздвигаем по Y — ТОЛЬКО ВНИЗ
+            const push = overlapY / 2 + 1;
+            if (dy >= 0) {
+              b.y += push * 2;
+            } else {
+              a.y += push * 2;
+            }
+          }
+
+          // Гарантия: ребёнок всё равно ниже родителя
+          if (a.parent && a.y < a.parent.y + GENERATION_STEP_Y_MIN) {
+            a.y = a.parent.y + GENERATION_STEP_Y_MIN;
+          }
+          if (b.parent && b.y < b.parent.y + GENERATION_STEP_Y_MIN) {
+            b.y = b.parent.y + GENERATION_STEP_Y_MIN;
+          }
+        }
+      }
+    }
+
+    if (!moved) break;
+  }
+}
 
 function adjustAllPositions(root) {
   // === 1. РЕАЛЬНЫЕ ПРЕДКИ ===
-  // Обходим от корня к листьям, чтобы parent.y уже был финальным
   const realNodes = root.descendants()
     .filter(d => !d.data.isGenerated)
     .sort((a, b) => a.depth - b.depth);
@@ -130,20 +189,15 @@ function adjustAllPositions(root) {
 
     // Jitter по X — свободный
     node.x += hashNoise(node.data.id, 1) * JITTER.xByDepth[depth];
-
-    // Наклон — свободный
     node.rotation = hashNoise(node.data.id, 3) * JITTER.rotateByDepth[depth];
 
-    // Jitter по Y — ТОЛЬКО ВНИЗ
+    // Jitter по Y — только вниз
     const yJitter = Math.abs(hashNoise(node.data.id, 2)) * JITTER.yByDepth[depth];
     node.y += yJitter;
 
-    // ГЛАВНОЕ ПРАВИЛО: ребёнок ВСЕГДА ниже родителя
     if (node.parent) {
       const minY = node.parent.y + GENERATION_STEP_Y_MIN;
-      if (node.y < minY) {
-        node.y = minY;
-      }
+      if (node.y < minY) node.y = minY;
     }
   });
 
@@ -167,6 +221,9 @@ function adjustAllPositions(root) {
     node.y = parent.y + GENERATION_STEP_Y + yJitter;
     node.rotation = hashNoise(node.data.id, 13) * 4;
   });
+
+  // === 3. РАЗРЕШАЕМ КОЛЛИЗИИ ===
+  resolveCollisions(root, 12);
 }
 
 adjustAllPositions(root);
@@ -217,7 +274,6 @@ function getInitials(name) {
 // ============================================
 const IR = CONFIG.infiniteRoots;
 
-// Генерируем БЕЗЫМЯННОГО предка — только пол, дата, id
 function generateAncestor(childId, childBirth, childGeneration, side) {
   const gender = side === 'father' ? 'male' : 'female';
   const id = `gen_${childId}_${side}`;
@@ -245,7 +301,6 @@ function generateAncestor(childId, childBirth, childGeneration, side) {
   };
 }
 
-// Ищет узел в familyData
 function findInFamilyData(node, id) {
   if (node.id === id) return node;
   if (!node.children) return null;
@@ -256,7 +311,6 @@ function findInFamilyData(node, id) {
   return null;
 }
 
-// Загружает следующее поколение
 function loadNextGeneration(datum) {
   if (datum.depth >= IR.maxGenerations) {
     console.log('⛔ Достигнут максимум поколений');
@@ -382,7 +436,6 @@ let nodes = nodeLayer.selectAll('.node');
 let pulses = pulseLayer.selectAll('.pulse');
 
 function renderTree(animateEntrance = false) {
-  // Связи
   links = linkLayer.selectAll('.link')
     .data(root.links(), d => d.target.data.id);
 
@@ -408,7 +461,6 @@ function renderTree(animateEntrance = false) {
   links = linksEnter.merge(links);
   links.attr('d', organicLink);
 
-  // Узлы
   nodes = nodeLayer.selectAll('.node')
     .data(root.descendants(), d => d.data.id);
 
@@ -438,14 +490,12 @@ function renderTree(animateEntrance = false) {
     .attr('cy', 0)
     .attr('r', CONFIG.avatarRadius);
 
-  // Инициалы — "?" для сгенерированных
   nodesEnter.append('text')
     .attr('class', 'avatar-text')
     .attr('x', avatarX)
     .attr('y', 0)
     .text(d => getInitials(d.data.name));
 
-  // Имя — пусто для сгенерированных
   nodesEnter.append('text')
     .attr('class', 'card-name')
     .attr('x', avatarX + 26)
@@ -456,7 +506,6 @@ function renderTree(animateEntrance = false) {
       return parts.length > 1 ? `${parts[0]} ${parts[1]}` : d.data.name;
     });
 
-  // Дата
   nodesEnter.append('text')
     .attr('class', 'card-date')
     .attr('x', avatarX + 26)
@@ -759,9 +808,8 @@ if (CONFIG.breathing.enabled) {
         const phase = (hashNoise(d.data.id, 9) + 1) * Math.PI;
         const t = (now - startTime) / dur + phase;
 
-        // X колеблется в обе стороны — свободно
+        // X — свободно, Y — только вниз
         const dx = Math.sin(t) * finalAmp;
-        // Y колеблется ТОЛЬКО ВНИЗ — не поднимаем узел выше родителя
         const dy = Math.abs(Math.cos(t * 0.7)) * finalAmp * 0.3;
 
         return nodeTransform(d, dx, dy);
