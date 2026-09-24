@@ -7,6 +7,8 @@ html, body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   background: radial-gradient(ellipse at center, #12122a 0%, #05050f 100%);
   color: #e0e0ff;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
 }
 
 /* === ЗАГОЛОВОК === */
@@ -82,14 +84,12 @@ html, body {
 
 .card-name {
   fill: #e0e0ff;
-  font-size: 12px;
   font-weight: 600;
   pointer-events: none;
 }
 
 .card-date {
   fill: #6b6b8a;
-  font-size: 10px;
   pointer-events: none;
 }
 
@@ -101,7 +101,6 @@ html, body {
 
 .avatar-text {
   fill: #a0a0c0;
-  font-size: 13px;
   font-weight: 700;
   text-anchor: middle;
   dominant-baseline: central;
@@ -185,12 +184,17 @@ html, body {
   transition: all 0.2s;
   backdrop-filter: blur(10px);
   min-width: 44px;
+  user-select: none;
 }
 
 #controls button:hover {
   border-color: #4a9eff;
   color: #4a9eff;
   transform: translateY(-2px);
+}
+
+#controls button:active {
+  transform: scale(0.95);
 }
 
 #controls button.active {
@@ -224,20 +228,107 @@ html, body {
   mix-blend-mode: screen;
 }
 
-/* Яркие пульсы для реальных предков */
-.pulse.real {
-  mix-blend-mode: screen;
-}
-
-/* Тусклые для сгенерированных */
-.pulse.generated {
-  mix-blend-mode: normal;
-}
-
-/* === АДАПТИВ === */
+/* ============================================
+   === МОБИЛЬНАЯ ВЕРСИЯ ===
+   ============================================ */
 @media (max-width: 768px) {
-  #header h1 { font-size: 16px; }
-  #header .subtitle { display: none; }
-  #controls { right: 12px; bottom: 60px; }
-  #controls button { padding: 8px 10px; font-size: 12px; }
+  #header {
+    padding: 12px 16px;
+  }
+
+  #header h1 {
+    font-size: 16px;
+  }
+
+  #header .subtitle {
+    display: none;
+  }
+
+  #controls {
+    right: 0;
+    left: 0;
+    bottom: 55px;
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 12px;
+  }
+
+  #controls button {
+    padding: 8px 10px;
+    font-size: 11px;
+    min-width: auto;
+    border-radius: 8px;
+  }
+
+  #footer {
+    left: 16px;
+    bottom: 12px;
+    font-size: 10px;
+  }
+
+  .tooltip {
+    max-width: 240px;
+    font-size: 12px;
+    padding: 12px 14px;
+  }
+
+  .tooltip strong {
+    font-size: 14px;
+  }
+
+  .tooltip .row {
+    font-size: 11px;
+  }
+}
+
+/* Очень узкие экраны */
+@media (max-width: 400px) {
+  #header h1 { font-size: 14px; }
+
+  #controls {
+    bottom: 45px;
+    gap: 4px;
+  }
+
+  #controls button {
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+
+  #footer {
+    font-size: 9px;
+  }
+}
+
+/* Альбомная ориентация на телефоне */
+@media (max-height: 500px) and (orientation: landscape) {
+  #header {
+    padding: 8px 16px;
+  }
+
+  #header h1 {
+    font-size: 14px;
+  }
+
+  #controls {
+    right: 12px;
+    bottom: 12px;
+    left: auto;
+    flex-direction: column;
+    padding: 0;
+    flex-wrap: nowrap;
+  }
+
+  #controls button {
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+
+  #footer {
+    bottom: 8px;
+    left: 12px;
+    font-size: 9px;
+  }
 }
