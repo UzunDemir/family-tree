@@ -57,7 +57,6 @@ function buildHierarchy(data) {
     return null;
   }
 
-  // Копирует сгенерированных детей из источника
   function copyGenerated(targetNode, sourceNode) {
     if (!sourceNode.children || sourceNode.children.length === 0) return;
     targetNode.children = targetNode.children || [];
@@ -65,10 +64,9 @@ function buildHierarchy(data) {
       const newNode = makeNode(
         srcChild.id, srcChild.name, srcChild.birth,
         srcChild.gender, srcChild.generation,
-        false, true  // isGenerated = true
+        false, true
       );
       targetNode.children.push(newNode);
-      // Рекурсивно
       copyGenerated(newNode, srcChild);
     });
   }
@@ -99,7 +97,6 @@ function buildHierarchy(data) {
     if (target) target.children.push(node);
   });
 
-  // Применяем сгенерированных детей из greatGrandparents
   (data.greatGrandparents || []).forEach(ggp => {
     const target = findNodeById(root, ggp.id);
     if (target) {
