@@ -446,3 +446,29 @@ document.addEventListener('keydown', (e) => {
     svg.transition().duration(300).call(zoom.scaleBy, 0.7);
   }
 });
+
+// === ЖИВОЕ ДЫХАНИЕ ===
+// Каждый узел медленно колеблется вокруг своей позиции
+nodes.each(function(d) {
+  const node = d3.select(this);
+  const baseX = d.x + offsetX;
+  const baseY = d.y + offsetY;
+  const { scale } = getGenerationStyle(d.depth);
+
+  const amp = 2 + d.depth * 1.5;       // амплитуда
+  const dur = 4000 + Math.random() * 3000; // скорость
+  const phase = Math.random() * Math.PI * 2;
+
+  function tick() {
+    const t = Date.now() / dur + phase;
+    const dx = Math.sin(t) * amp;
+    const dy = Math.cos(t * 0.7) * amp * 0.6;
+
+    node.attr('transform',
+      `translate(${baseX + dx}, ${baseY + dy}) rotate(${d.rotation || 0}) scale(${scale})`
+    );
+
+    requestAnimationFrame(tick);
+  }
+  tick();
+});
