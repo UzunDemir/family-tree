@@ -1,5 +1,5 @@
 /**
- * Семейное древо Узун — D3.js + бесконечные корни (растут ВВЕРХ, ровно)
+ * Семейное древо Узун — D3.js + бесконечные корни (растут ВВЕРХ, «живые»)
  */
 
 // === КОНФИГУРАЦИЯ ===
@@ -120,9 +120,9 @@ const JITTER = {
   rotateByDepth: [0, 1.5, 3, 5]
 };
 
-// Вертикальный шаг между поколениями для сгенерированных
+// Вертикальный шаг между поколениями
 const GENERATION_STEP_Y = 90;
-// Боковое смещение отца/матери (чтобы не слипались)
+// Боковое смещение отца/матери
 const PARENT_SIDE_OFFSET = 35;
 
 function adjustAllPositions(root) {
@@ -143,7 +143,7 @@ function adjustAllPositions(root) {
     }
   });
 
-  // 2. Сгенерированные — строго над родителем, ровно вверх
+  // 2. Сгенерированные — «живые», но строго вверх
   const generated = root.descendants()
     .filter(d => d.data.isGenerated)
     .sort((a, b) => a.depth - b.depth);
@@ -152,14 +152,23 @@ function adjustAllPositions(root) {
     const parent = node.parent;
     if (!parent) return;
 
-    // Отец чуть слева, мать чуть справа
-    const sideOffset = node.data.gender === 'male'
+    // Боковое смещение: отец/мать друг от друга
+    const baseSideOffset = node.data.gender === 'male'
       ? -PARENT_SIDE_OFFSET
       : PARENT_SIDE_OFFSET;
 
-    node.x = parent.x + sideOffset;
-    node.y = parent.y - GENERATION_STEP_Y;
-    node.rotation = 0;
+    // Живой сдвиг в стороны — ±25px, детерминированный
+    const sideJitter = hashNoise(node.data.id, 11) * 25;
+
+    // Вертикальный сдвиг — лёгкий разброс
+    const yJitter = hashNoise(node.data.id, 12) * 20;
+
+    // Наклон — ±4°
+    const rotation = hashNoise(node.data.id, 13) * 4;
+
+    node.x = parent.x + baseSideOffset + sideJitter;
+    node.y = parent.y - GENERATION_STEP_Y - yJitter;
+    node.rotation = rotation;
 
     node.xIdeal = node.x;
     node.yIdeal = node.y;
@@ -185,14 +194,13 @@ function organicLink(d) {
   const tx = d.target.x + offsetX;
   const ty = d.target.y + offsetY;
 
-  // Сгенерированные — прямая вертикальная линия
-  if (d.target.data.isGenerated) {
-    return `M${sx},${sy} L${tx},${ty}`;
-  }
+  // Для сгенерированных — мягкий изгиб
+  const isGenerated = d.target.data.isGenerated;
+  const bendFactor = isGenerated ? 0.15 : 0.25;
 
-  // Реальные — органическая кривая
   const midY = (sy + ty) / 2;
-  const bend = (tx - sx) * 0.25;
+  const bend = (tx - sx) * bendFactor;
+
   return `M${sx},${sy} C${sx + bend},${midY} ${tx - bend},${midY} ${tx},${ty}`;
 }
 
@@ -249,7 +257,7 @@ function generateAncestor(childId, childBirth, childGeneration, side) {
   };
 }
 
-// Ищет узел в familyData (рекурсивно, обходит все ветки)
+// Ищет узел в familyData
 function findInFamilyData(node, id) {
   if (node.id === id) return node;
   if (!node.children) return null;
@@ -260,40 +268,7 @@ function findInFamilyData(node, id) {
   return null;
 }
 
-// Добавляет детей к узлу в familyData
-function extendFamilyData(parentId, newChildren) {
-  const allParents = [
-    ...(familyData.parents || []),
-    ...(familyData.grandparents || []),
-    ...(familyData.greatGrandparents || [])
-  ];
-
-  function searchDeep(node) {
-    if (node.id === parentId) return node;
-    if (node.children) {
-      for (const c of node.children) {
-        const f = searchDeep(c);
-        if (f) return f;
-      }
-    }
-    return null;
-  }
-
-  let target = null;
-  for (const p of allParents) {
-    target = searchDeep(p);
-    if (target) break;
-  }
-
-  if (target) {
-    target.children = target.children || [];
-    target.children.push(...newChildren);
-    return true;
-  }
-  return false;
-}
-
-// Загружает следующее поколение для D3-узла
+// Загружает следующее поколение
 function loadNextGeneration(datum) {
   if (datum.depth >= IR.maxGenerations) return false;
   if (datum._childrenLoaded) return false;
@@ -303,10 +278,8 @@ function loadNextGeneration(datum) {
 
   console.log('✨ Генерирую предков для', datum.data.name, '→', father.name, '+', mother.name);
 
-  // Ищем в familyData
   let targetInData = findInFamilyData(familyData, datum.data.id);
 
-  // Если не нашли — ищем в сгенерированных ветках
   if (!targetInData) {
     const allParents = [
       ...(familyData.parents || []),
@@ -353,8 +326,6 @@ function rebuildAndRender() {
   const newRoot = d3.hierarchy(newHierarchyData);
 
   treeLayout(newRoot);
-
-  // ВАЖНО: правильная функция
   adjustAllPositions(newRoot);
 
   newRoot.descendants().forEach(d => {
@@ -533,7 +504,7 @@ function updateStats() {
     `👥 ${totalPeople} человек · ${deepest + 1} поколений`;
 }
 
-// === АНИМАЦИЯ ПУЛЬСОВ ===
+// === ПУЛЬСЫ ===
 if (CONFIG.pulse.enabled) {
   function animatePulses() {
     pulseLayer.selectAll('.pulse').each(function(d) {
@@ -775,12 +746,11 @@ if (CONFIG.breathing.enabled) {
       const now = Date.now();
 
       nodeLayer.selectAll('.node').attr('transform', function(d) {
-        // Сгенерированные не дышат — они должны стоять ровно
-        if (d.data.isGenerated) {
-          return nodeTransform(d, 0, 0);
-        }
-
+        // Амплитуда зависит от поколения
         const amp = CONFIG.breathing.baseAmp + d.depth * CONFIG.breathing.ampPerDepth;
+
+        // Сгенерированные дышат мягче — они дальше
+        const finalAmp = d.data.isGenerated ? amp * 0.6 : amp;
 
         const dur = CONFIG.breathing.minDuration +
                     (hashNoise(d.data.id, 7) + 1) / 2 *
@@ -789,8 +759,8 @@ if (CONFIG.breathing.enabled) {
         const phase = (hashNoise(d.data.id, 9) + 1) * Math.PI;
         const t = (now - startTime) / dur + phase;
 
-        const dx = Math.sin(t) * amp;
-        const dy = Math.cos(t * 0.7) * amp * 0.6;
+        const dx = Math.sin(t) * finalAmp;
+        const dy = Math.cos(t * 0.7) * finalAmp * 0.6;
 
         return nodeTransform(d, dx, dy);
       });
