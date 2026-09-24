@@ -546,43 +546,20 @@ function renderTree(animateEntrance = false) {
 
   const avatarX = -CONFIG.cardWidth / 2 + 28;
 
-  // nodesEnter.append('circle')
-  //   .attr('class', d => `avatar-circle ${d.data.gender}`)
-  //   .attr('cx', avatarX)
-  //   .attr('cy', 0)
-  //   .attr('r', CONFIG.avatarRadius);
-
-  // nodesEnter.append('text')
-  //   .attr('class', 'avatar-text')
-  //   .attr('x', avatarX)
-  //   .attr('y', 0)
-  //   .style('font-size', FONT_AVATAR)
-  //   .text(d => getInitials(d.data.name));
-
-  // === ФОТО или АВАТАР с инициалами ===
-const AVATAR_R = CONFIG.avatarRadius;
-
-// Клипающий путь (круг) — для обрезки фото
-const clipId = `clip-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-defs.append('clipPath')
-  .attr('id', clipId)
-  .append('circle')
-  .attr('cx', avatarX)
-  .attr('cy', 0)
-  .attr('r', AVATAR_R);
-
-// Сначала пробуем фото, потом fallback на инициалы
-nodesEnter.each(function(d) {
-  const node = d3.select(this);
-  const photoPath = `photos/${d.data.id}.jpg`;
-
-  // Заглушка — инициалы
-  node.append('circle')
-    .attr('class', `avatar-circle ${d.data.gender}`)
+  nodesEnter.append('circle')
+    .attr('class', d => `avatar-circle ${d.data.gender}`)
     .attr('cx', avatarX)
     .attr('cy', 0)
-    .attr('r', AVATAR_R)
-    .style('opacity', 1);
+    .attr('r', CONFIG.avatarRadius);
+
+  nodesEnter.append('text')
+    .attr('class', 'avatar-text')
+    .attr('x', avatarX)
+    .attr('y', 0)
+    .style('font-size', FONT_AVATAR)
+    .text(d => getInitials(d.data.name));
+
+  
 
   node.append('text')
     .attr('class', 'avatar-text')
