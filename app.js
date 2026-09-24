@@ -622,7 +622,7 @@ function attachNodeHandlers(selection) {
         <div class="row">Дата рождения: <span>${d.data.birth || 'неизвестна'}</span></div>
         <div class="row">Поколение: <span>${genLabel}</span></div>
         <div class="row">Пол: <span>${genderLabel}</span></div>
-        ${d.children ? `<div class="row">Детей в древе: <span>${d.children.length}</span></div>` : ''}
+        // ${d.children ? `<div class="row">Детей в древе: <span>${d.children.length}</span></div>` : ''}
         ${generatedLabel}
       `)
       .style('left', (event.pageX + 15) + 'px')
