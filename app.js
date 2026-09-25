@@ -265,7 +265,7 @@ function adjustAllPositions(root) {
       }
     });
 
-  // ⬇️ СОХРАНЯЕМ СТАБИЛЬНЫЕ КООРДИНАТЫ (без дыхания) — для зума
+  // СОХРАНЯЕМ СТАБИЛЬНЫЕ КООРДИНАТЫ (без дыхания) — для зума
   root.descendants().forEach(node => {
     node.xIdeal = node.x;
     node.yIdeal = node.y;
@@ -278,7 +278,6 @@ adjustAllPositions(root);
 function centerRoot() {
   const rootX = root.x;
   offsetX = width / 2 - rootX;
-  console.log(`📐 Центрирование: root.x = ${rootX.toFixed(1)}, offsetX = ${offsetX.toFixed(1)}`);
 }
 
 centerRoot();
@@ -403,8 +402,6 @@ function loadNextGeneration(datum) {
   const father = generateAncestor(datum.data.id, datum.data.birth, datum.depth, 'father');
   const mother = generateAncestor(datum.data.id, datum.data.birth, datum.depth, 'mother');
 
-  console.log('✨ Генерирую предков для', datum.data.name || '(безымянный)');
-
   let targetInData = findInFamilyData(familyData, datum.data.id);
 
   if (!targetInData) {
@@ -515,7 +512,6 @@ let nodes = nodeLayer.selectAll('.node');
 let pulses = pulseLayer.selectAll('.pulse');
 
 function renderTree(animateEntrance = false) {
-  // Связи
   links = linkLayer.selectAll('.link')
     .data(root.links(), d => d.target.data.id);
 
@@ -541,7 +537,6 @@ function renderTree(animateEntrance = false) {
   links = linksEnter.merge(links);
   links.attr('d', organicLink);
 
-  // Узлы
   nodes = nodeLayer.selectAll('.node')
     .data(root.descendants(), d => d.data.id);
 
@@ -611,7 +606,6 @@ function renderTree(animateEntrance = false) {
   renderPulses();
   updateStats();
 
-  // Восстанавливаем закреплённую карточку после перерисовки
   if (pinnedNodeId) {
     const pinnedNode = root.descendants().find(d => d.data.id === pinnedNodeId);
     if (pinnedNode) {
@@ -818,10 +812,10 @@ function attachNodeHandlers(selection) {
     pinNode(d);
     pinnedNodeId = d.data.id;
 
-    // ⬇️ ПАУЗА ДЫХАНИЯ на время зума
-    pauseBreathingFor(CONFIG.duration.zoom + 400);
+    // ПАУЗА ДЫХАНИЯ на время зума и загрузки для избежания скачков
+    pauseBreathingFor(CONFIG.duration.zoom + 800);
 
-    // Используем СТАБИЛЬНЫЕ координаты (без дыхания) для точного зума
+    // Используем исключительно СТАБИЛЬНЫЕ идеальные координаты для зума
     const baseX = d.xIdeal !== undefined ? d.xIdeal : d.x;
     const baseY = d.yIdeal !== undefined ? d.yIdeal : d.y;
 
@@ -927,17 +921,10 @@ function resetHighlight() {
 
 // === УДАЛЕНИЕ СГЕНЕРИРОВАННЫХ ПРЕДКОВ ===
 function clearGeneratedAncestors() {
-  console.log('🌫 Начинаю удаление сгенерированных предков...');
-
   const generatedNodes = nodeLayer.selectAll('.node')
     .filter(d => d.data.isGenerated);
 
-  if (generatedNodes.empty()) {
-    console.log('ℹ️ Нет сгенерированных предков для удаления');
-    return;
-  }
-
-  console.log(`🗑️ Найдено ${generatedNodes.size()} сгенерированных узлов`);
+  if (generatedNodes.empty()) return;
 
   generatedNodes
     .transition()
@@ -965,8 +952,6 @@ function clearGeneratedAncestors() {
     .attr('opacity', 0);
 
   setTimeout(() => {
-    console.log('🧹 Чищу familyData от сгенерированных...');
-
     function deepClean(node) {
       if (!node || !node.children || node.children.length === 0) return;
       node.children = node.children.filter(c => !c.isGenerated);
@@ -986,12 +971,6 @@ function clearGeneratedAncestors() {
     (familyData.grandparents || []).forEach(walkAll);
     (familyData.greatGrandparents || []).forEach(walkAll);
 
-    let remaining = 0;
-    root.descendants().forEach(d => { if (d.data.isGenerated) remaining++; });
-    console.log(`🔍 Осталось сгенерированных в D3 до пересборки: ${remaining}`);
-
-    console.log('🔄 Пересобираю дерево...');
-
     pinnedNodeId = null;
 
     nodeLayer.selectAll('.node').remove();
@@ -1007,10 +986,6 @@ function clearGeneratedAncestors() {
     centerRoot();
 
     renderTree(true);
-
-    console.log('✅ Сброс завершён. Глубина:', 
-      root.descendants().reduce((max, d) => Math.max(max, d.depth), 0) + 1, 'поколений');
-
     showDepthStatus();
   }, 1900);
 }
@@ -1109,7 +1084,6 @@ if (CONFIG.breathing.enabled) {
   setTimeout(() => { entranceDone = true; }, CONFIG.duration.entrance + 200);
 
   function breathe() {
-    // ⬇️ Проверяем breathingPaused
     if (entranceDone && !zoomActive && !breathingPaused) {
       const now = Date.now();
 
@@ -1118,29 +1092,20 @@ if (CONFIG.breathing.enabled) {
         const finalAmp = d.data.isGenerated ? amp * 0.4 : amp;
 
         const dur = CONFIG.breathing.minDuration +
-                    (hashNoise(d.data.id, 7) + 1) / 2 *
-                    (CONFIG.breathing.maxDuration - CONFIG.breathing.minDuration);
+                    (hashNoise(d.data.id, 7) + 1) * 
+                    (CONFIG.breathing.maxDuration - CONFIG.breathing.minDuration) / 2;
 
-        const phase = (hashNoise(d.data.id, 9) + 1) * Math.PI;
-        const t = (now - startTime) / dur + phase;
+        const phase = hashNoise(d.data.id, 11) * Math.PI * 2;
+        const dy = Math.sin((now - startTime) / dur * Math.PI * 2 + phase) * finalAmp;
 
-        const dx = Math.sin(t) * Math.min(finalAmp, 3);
-        const dy = Math.abs(Math.cos(t * 0.7)) * Math.min(finalAmp, 3);
-
-        return nodeTransform(d, dx, dy);
+        const baseX = d.xIdeal !== undefined ? d.xIdeal : d.x;
+        const baseY = d.yIdeal !== undefined ? d.yIdeal : d.y;
+        
+        const tempD = { ...d, x: baseX, y: baseY };
+        return nodeTransform(tempD, 0, dy);
       });
     }
     requestAnimationFrame(breathe);
   }
-  breathe();
-}
-
-// === ИНДИКАТОР ГЛУБИНЫ ===
-const footer = document.getElementById('footer');
-if (footer && !document.getElementById('infinite-status')) {
-  const status = document.createElement('span');
-  status.id = 'infinite-status';
-  status.style.cssText = 'margin-left: 16px; color: #a06bff; transition: opacity 0.5s; opacity: 0.4;';
-  status.textContent = `🌌 Глубина рода: ${root.descendants().reduce((max, d) => Math.max(max, d.depth), 0) + 1} поколений`;
-  footer.appendChild(status);
+  requestAnimationFrame(breathe);
 }
