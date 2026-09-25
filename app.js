@@ -10,8 +10,7 @@
  *   - Яркие пульсы для реальных, тусклые для сгенерированных
  *   - Кнопка «Сброс рода» — медленное исчезновение
  *   - Дерево центрируется по корню (Демир)
- *   - Клик = закрепить + кнопка 🔗 Открыть (если есть link)
- *   - Дыхание на паузе во время зума — без отскоков
+ *   - Клик = закрепить (без зума, без отскока) + кнопка 🔗 Открыть
  */
 
 // ============================================
@@ -265,7 +264,7 @@ function adjustAllPositions(root) {
       }
     });
 
-  // ⬇️ СОХРАНЯЕМ СТАБИЛЬНЫЕ КООРДИНАТЫ (без дыхания) — для зума
+  // Сохраняем идеальные координаты
   root.descendants().forEach(node => {
     node.xIdeal = node.x;
     node.yIdeal = node.y;
@@ -705,7 +704,7 @@ function pinNode(d) {
 
   nodeLayer.selectAll('.node')
     .filter(nd => nd.data.id === d.data.id)
-    .selectAll('.pin-badge, .link-button')
+    .selectAll('.link-button')
     .remove();
 
   const targetNode = nodeLayer.selectAll('.node')
@@ -714,12 +713,7 @@ function pinNode(d) {
   const cardW = CONFIG.cardWidth;
   const cardH = CONFIG.cardHeight;
 
-  targetNode.append('text')
-    .attr('class', 'pin-badge')
-    .attr('x', cardW / 2 - 12)
-    .attr('y', -cardH / 2 + 12)
-    .text('📌');
-
+  // Кнопка-ссылка (если есть link)
   if (d.data.link && d.data.link.trim().length > 0) {
     const btnWidth = 100;
     const btnHeight = 22;
@@ -755,7 +749,7 @@ function unpinNode(id) {
   targetNode.select('.card-bg')
     .classed('pinned', false);
 
-  targetNode.selectAll('.pin-badge, .link-button')
+  targetNode.selectAll('.link-button')
     .remove();
 }
 
@@ -801,7 +795,7 @@ function attachNodeHandlers(selection) {
     });
   }
 
-  // === CLICK — закрепить/снять ===
+  // === CLICK — закрепить/снять (БЕЗ ЗУМА) ===
   selection.on('click', (event, d) => {
     event.stopPropagation();
 
@@ -818,20 +812,8 @@ function attachNodeHandlers(selection) {
     pinNode(d);
     pinnedNodeId = d.data.id;
 
-    // ⬇️ ПАУЗА ДЫХАНИЯ на время зума
-    pauseBreathingFor(CONFIG.duration.zoom + 400);
-
-    // Используем СТАБИЛЬНЫЕ координаты (без дыхания) для точного зума
-    const baseX = d.xIdeal !== undefined ? d.xIdeal : d.x;
-    const baseY = d.yIdeal !== undefined ? d.yIdeal : d.y;
-
-    const scale = IS_MOBILE ? 1.3 : 1.6;
-    const x = width / 2 - (baseX + offsetX) * scale;
-    const y = height / 2 - (baseY + offsetY) * scale;
-
-    svg.transition()
-      .duration(CONFIG.duration.zoom)
-      .call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(scale));
+    // Пауза дыхания — чтобы рамка не «дышала»
+    pauseBreathingFor(3000);
 
     animateAncestorWave(d);
 
