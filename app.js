@@ -1,17 +1,6 @@
 /**
  * Семейное древо Узун — D3.js + бесконечные корни
  * Адаптив: монитор / планшет / телефон
- * 
- * Правила:
- *   - ЛЮБОЙ узел ВСЕГДА ниже родителя
- *   - Сгенерированные узлы БЕЗ имён
- *   - Связи — вертикальные S-кривые, известные — короче
- *   - Карточки НЕ наезжают друг на друга
- *   - Яркие пульсы для реальных, тусклые для сгенерированных
- *   - Кнопка «Сброс рода» — медленное исчезновение
- *   - Дерево центрируется по корню (Демир)
- *   - Клик = закрепить + кнопка 🔗 Открыть (если есть link)
- *   - Дыхание на паузе во время зума — без отскоков
  */
 
 // ============================================
@@ -265,7 +254,7 @@ function adjustAllPositions(root) {
       }
     });
 
-  // СОХРАНЯЕМ СТАБИЛЬНЫЕ КООРДИНАТЫ (без дыхания) — для зума
+  // СОХРАНЯЕМ ИДЕАЛЬНЫЕ КООРДИНАТЫ
   root.descendants().forEach(node => {
     node.xIdeal = node.x;
     node.yIdeal = node.y;
@@ -456,9 +445,7 @@ function rebuildAndRender() {
   });
 
   root = newRoot;
-
   centerRoot();
-
   renderTree(true);
 }
 
@@ -812,10 +799,17 @@ function attachNodeHandlers(selection) {
     pinNode(d);
     pinnedNodeId = d.data.id;
 
-    // ПАУЗА ДЫХАНИЯ на время зума и загрузки для избежания скачков
-    pauseBreathingFor(CONFIG.duration.zoom + 800);
+    // Пауза дыхания на время зума
+    pauseBreathingFor(1200);
 
-    // Используем исключительно СТАБИЛЬНЫЕ идеальные координаты для зума
+    // СБРАСЫВАЕМ дыхание мгновенно в 0 для всех узлов при клике (устраняет скачок)
+    nodeLayer.selectAll('.node').attr('transform', function(nodeData) {
+      const bX = nodeData.xIdeal !== undefined ? nodeData.xIdeal : nodeData.x;
+      const bY = nodeData.yIdeal !== undefined ? nodeData.yIdeal : nodeData.y;
+      const tempD = { ...nodeData, x: bX, y: bY };
+      return nodeTransform(tempD, 0, 0);
+    });
+
     const baseX = d.xIdeal !== undefined ? d.xIdeal : d.x;
     const baseY = d.yIdeal !== undefined ? d.yIdeal : d.y;
 
@@ -984,7 +978,6 @@ function clearGeneratedAncestors() {
     root = newRoot;
 
     centerRoot();
-
     renderTree(true);
     showDepthStatus();
   }, 1900);
