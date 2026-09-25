@@ -90,7 +90,6 @@ html, body {
   fill: #1e1e3a !important;
 }
 
-/* Метка «закреплено» в углу */
 .pin-badge {
   fill: #a06bff;
   font-size: 14px;
@@ -99,27 +98,27 @@ html, body {
   pointer-events: none;
 }
 
-/* === КНОПКА FACEBOOK === */
-.fb-button {
+/* === УНИВЕРСАЛЬНАЯ КНОПКА-ССЫЛКА === */
+.social-button {
   cursor: pointer;
-  transition: all 0.2s;
+  transition: filter 0.2s;
 }
 
-.fb-button:hover {
+.social-button:hover {
   filter: drop-shadow(0 0 8px rgba(74, 158, 255, 0.9));
 }
 
-.fb-button rect {
-  fill: #1877f2;
-  stroke: #4a9eff;
+.social-button rect {
+  /* Цвет задаётся в JS через linkColor, здесь только дефолт */
+  stroke: rgba(255, 255, 255, 0.3);
   stroke-width: 1;
 }
 
-.fb-button:hover rect {
-  fill: #0d6efd;
+.social-button:hover rect {
+  filter: brightness(1.2);
 }
 
-.fb-button text {
+.social-button text {
   fill: #ffffff;
   font-size: 10px;
   font-weight: 700;
@@ -212,7 +211,7 @@ html, body {
 
 .tooltip .row span { color: #e0e0ff; }
 
-/* === КНОПКИ === */
+/* === КНОПКИ УПРАВЛЕНИЯ === */
 #controls {
   position: absolute;
   right: 24px;
@@ -319,7 +318,6 @@ html, body {
   .tooltip strong { font-size: 14px; }
   .tooltip .row { font-size: 11px; }
 
-  /* Крупнее, чем дефолт-адаптив */
   .card-name { font-size: 11px !important; }
   .card-date { font-size: 9px !important; }
   .avatar-text { font-size: 13px !important; }
