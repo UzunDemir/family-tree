@@ -162,7 +162,6 @@ function pauseBreathingFor(ms) {
 
 function enforceNoOverlapX(root) {
   const allNodes = root.descendants();
-
   const byDepth = {};
   allNodes.forEach(d => {
     if (!byDepth[d.depth]) byDepth[d.depth] = [];
@@ -175,10 +174,8 @@ function enforceNoOverlapX(root) {
     for (let i = 1; i < nodesAtDepth.length; i++) {
       const prev = nodesAtDepth[i - 1];
       const curr = nodesAtDepth[i];
-
       const bothGenerated = prev.data.isGenerated && curr.data.isGenerated;
       const minDx = bothGenerated ? 30 : CARD_MIN_DX;
-
       const dx = curr.x - prev.x;
 
       if (dx < minDx) {
@@ -208,7 +205,6 @@ function adjustAllPositions(root) {
 
   realNodes.forEach(node => {
     const depth = Math.min(node.depth, JITTER.yByDepth.length - 1);
-
     const yJitter = Math.abs(hashNoise(node.data.id, 2)) * JITTER.yByDepth[depth] * 0.5;
     node.y += yJitter;
 
@@ -229,12 +225,8 @@ function adjustAllPositions(root) {
     const parent = node.parent;
     if (!parent) return;
 
-    const baseSideOffset = node.data.gender === 'male'
-      ? -PARENT_SIDE_OFFSET
-      : PARENT_SIDE_OFFSET;
-
+    const baseSideOffset = node.data.gender === 'male' ? -PARENT_SIDE_OFFSET : PARENT_SIDE_OFFSET;
     const yJitter = Math.abs(hashNoise(node.data.id, 12)) * (IS_MOBILE ? 12 : 20);
-
     const depthFactor = Math.max(0.4, 1 - node.depth * 0.08);
     const step = GENERATION_STEP_Y * depthFactor;
 
@@ -254,7 +246,6 @@ function adjustAllPositions(root) {
       }
     });
 
-  // СОХРАНЯЕМ ИДЕАЛЬНЫЕ КООРДИНАТЫ
   root.descendants().forEach(node => {
     node.xIdeal = node.x;
     node.yIdeal = node.y;
@@ -263,7 +254,6 @@ function adjustAllPositions(root) {
 
 adjustAllPositions(root);
 
-// === ЦЕНТРИРОВАНИЕ ПО КОРНЮ ===
 function centerRoot() {
   const rootX = root.x;
   offsetX = width / 2 - rootX;
@@ -271,7 +261,6 @@ function centerRoot() {
 
 centerRoot();
 
-// === БЕСКОНЕЧНОСТЬ ===
 function getGenerationStyle(generation) {
   const t = generation / CONFIG.maxGeneration;
   const { minOpacity, minScale, opacityFalloff, scaleFalloff } = CONFIG.infinity;
@@ -281,26 +270,21 @@ function getGenerationStyle(generation) {
   };
 }
 
-// === СВЯЗИ ===
 function organicLink(d) {
   const sx = d.source.x + offsetX;
   const sy = d.source.y + offsetY;
   const tx = d.target.x + offsetX;
   const ty = d.target.y + offsetY;
-
   const midY = (sy + ty) / 2;
-
   return `M${sx},${sy} C${sx},${midY} ${tx},${midY} ${tx},${ty}`;
 }
 
-// === TRANSFORM ===
 function nodeTransform(d, dx = 0, dy = 0) {
   const { scale } = getGenerationStyle(d.depth);
   const rot = d.rotation || 0;
   return `translate(${d.x + offsetX + dx}, ${d.y + offsetY + dy}) rotate(${rot}) scale(${scale})`;
 }
 
-// === ВСПОМОГАТЕЛЬНЫЕ ===
 function getInitials(name) {
   if (!name) return '?';
   const parts = name.split(' ').filter(Boolean);
@@ -308,7 +292,7 @@ function getInitials(name) {
   return parts[0] ? parts[0][0].toUpperCase() : '?';
 }
 
-// === МОБИЛЬНЫЙ ТУЛТИП ===
+// === ТУЛТИП И КНОПКА ОТКРЫТЬ ===
 function showMobileTooltip(d, event) {
   const genLabel = d.depth === 0 ? 'Младшее поколение' : `${d.depth}-е поколение от младшего`;
   const genderLabel = d.data.gender === 'male' ? 'Мужской' : 'Женский';
@@ -316,8 +300,12 @@ function showMobileTooltip(d, event) {
     ? '<div class="row" style="color:#a06bff">✨ Восстановлено по роду</div>'
     : '';
 
-  const displayName = d.data.name
-    || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
+  const displayName = d.data.name || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
+
+  let linkHtml = '';
+  if (d.data.link && d.data.link.trim().length > 0) {
+    linkHtml = `<button class="btn-open-link" onclick="window.open('${d.data.link}', '_blank', 'noopener,noreferrer')">🔗 Открыть ссылку</button>`;
+  }
 
   tooltip
     .style('opacity', 1)
@@ -327,6 +315,7 @@ function showMobileTooltip(d, event) {
       <div class="row">Поколение: <span>${genLabel}</span></div>
       <div class="row">Пол: <span>${genderLabel}</span></div>
       ${generatedLabel}
+      ${linkHtml}
     `)
     .style('left', Math.min(event.pageX + 15, window.innerWidth - 260) + 'px')
     .style('top', Math.max(event.pageY - 120, 60) + 'px');
@@ -334,7 +323,7 @@ function showMobileTooltip(d, event) {
   clearTimeout(window._mobileTooltipTimer);
   window._mobileTooltipTimer = setTimeout(() => {
     tooltip.style('opacity', 0);
-  }, 2500);
+  }, 4000);
 }
 
 // ============================================
@@ -358,16 +347,7 @@ function generateAncestor(childId, childBirth, childGeneration, side) {
     }
   }
 
-  return {
-    id,
-    name: '',
-    birth,
-    gender,
-    generation: childGeneration + 1,
-    isGenerated: true,
-    link: null,
-    children: []
-  };
+  return { id, name: '', birth, gender, generation: childGeneration + 1, isGenerated: true, link: null, children: [] };
 }
 
 function findInFamilyData(node, id) {
@@ -383,23 +363,14 @@ function findInFamilyData(node, id) {
 function loadNextGeneration(datum) {
   if (datum.depth >= IR.maxGenerations) return false;
   if (datum._childrenLoaded) return false;
-
-  if (datum.data.children && datum.data.children.length > 0) {
-    return false;
-  }
+  if (datum.data.children && datum.data.children.length > 0) return false;
 
   const father = generateAncestor(datum.data.id, datum.data.birth, datum.depth, 'father');
   const mother = generateAncestor(datum.data.id, datum.data.birth, datum.depth, 'mother');
 
   let targetInData = findInFamilyData(familyData, datum.data.id);
-
   if (!targetInData) {
-    const allParents = [
-      ...(familyData.parents || []),
-      ...(familyData.grandparents || []),
-      ...(familyData.greatGrandparents || [])
-    ];
-
+    const allParents = [...(familyData.parents || []), ...(familyData.grandparents || []), ...(familyData.greatGrandparents || [])];
     function searchDeep(node) {
       if (node.id === datum.data.id) return node;
       if (node.children) {
@@ -410,7 +381,6 @@ function loadNextGeneration(datum) {
       }
       return null;
     }
-
     for (const p of allParents) {
       targetInData = searchDeep(p);
       if (targetInData) break;
@@ -423,11 +393,9 @@ function loadNextGeneration(datum) {
     datum._childrenLoaded = true;
     return true;
   }
-
   return false;
 }
 
-// === ПЕРЕСБОРКА ===
 function rebuildAndRender() {
   const oldLoadedIds = new Set();
   root.descendants().forEach(d => {
@@ -449,7 +417,6 @@ function rebuildAndRender() {
   renderTree(true);
 }
 
-// === АВТОЗАГРУЗКА ===
 let autoLoadTimer = null;
 function scheduleAutoLoad() {
   clearTimeout(autoLoadTimer);
@@ -617,39 +584,27 @@ function renderPulses() {
       const isReal = !d.target.data.isGenerated;
       return isReal ? 'pulse real' : 'pulse generated';
     })
-    .attr('r', d => {
-      return d.target.data.isGenerated
-        ? CONFIG.pulse.radius
-        : CONFIG.pulse.radius * 1.8;
-    })
+    .attr('r', d => d.target.data.isGenerated ? CONFIG.pulse.radius : CONFIG.pulse.radius * 1.8)
     .attr('fill', d => {
       if (d.target.data.isGenerated) return '#6b6b8a';
       return d.target.data.gender === 'male' ? '#4a9eff' : '#ff6bb0';
     })
     .attr('opacity', 0)
-    .attr('filter', d => {
-      return d.target.data.isGenerated
-        ? null
-        : (CONFIG.pulse.glow ? 'url(#glow)' : null);
-    })
+    .attr('filter', d => d.target.data.isGenerated ? null : (CONFIG.pulse.glow ? 'url(#glow)' : null))
     .merge(pulses);
 }
 
 function updateStats() {
   const totalPeople = root.descendants().length;
   const deepest = root.descendants().reduce((max, d) => Math.max(max, d.depth), 0);
-  document.getElementById('stats').textContent =
-    `👥 ${totalPeople} человек · ${deepest + 1} поколений`;
+  document.getElementById('stats').textContent = `👥 ${totalPeople} человек · ${deepest + 1} поколений`;
 }
 
-// === ПУЛЬСЫ ===
 if (CONFIG.pulse.enabled) {
   function animatePulses() {
     pulseLayer.selectAll('.pulse').each(function(d) {
       const pulse = d3.select(this);
-      const linkEl = linkLayer.selectAll('.link')
-        .filter(l => l.target.data.id === d.target.data.id);
-
+      const linkEl = linkLayer.selectAll('.link').filter(l => l.target.data.id === d.target.data.id);
       if (linkEl.empty()) return;
 
       const path = linkEl.node();
@@ -657,20 +612,14 @@ if (CONFIG.pulse.enabled) {
 
       const totalLength = path.getTotalLength();
       const baseDelay = (hashNoise(d.target.data.id, 42) + 1) * 1000;
-
       const isReal = !d.target.data.isGenerated;
       const speed = isReal ? CONFIG.pulse.speed * 0.6 : CONFIG.pulse.speed;
-
       const t = ((Date.now() + baseDelay) % speed) / speed;
       const point = path.getPointAtLength(t * totalLength);
-
       const maxOpacity = isReal ? 1.0 : 0.5;
       const opacity = Math.sin(t * Math.PI) * maxOpacity;
 
-      pulse
-        .attr('cx', point.x)
-        .attr('cy', point.y)
-        .attr('opacity', opacity);
+      pulse.attr('cx', point.x).attr('cy', point.y).attr('opacity', opacity);
     });
     requestAnimationFrame(animatePulses);
   }
@@ -679,19 +628,10 @@ if (CONFIG.pulse.enabled) {
 
 // === ЗАКРЕПИТЬ УЗЕЛ ===
 function pinNode(d) {
-  nodeLayer.selectAll('.node')
-    .filter(nd => nd.data.id === d.data.id)
-    .select('.card-bg')
-    .classed('pinned', true);
+  nodeLayer.selectAll('.node').filter(nd => nd.data.id === d.data.id).select('.card-bg').classed('pinned', true);
+  nodeLayer.selectAll('.node').filter(nd => nd.data.id === d.data.id).selectAll('.pin-badge').remove();
 
-  nodeLayer.selectAll('.node')
-    .filter(nd => nd.data.id === d.data.id)
-    .selectAll('.pin-badge, .link-button')
-    .remove();
-
-  const targetNode = nodeLayer.selectAll('.node')
-    .filter(nd => nd.data.id === d.data.id);
-
+  const targetNode = nodeLayer.selectAll('.node').filter(nd => nd.data.id === d.data.id);
   const cardW = CONFIG.cardWidth;
   const cardH = CONFIG.cardHeight;
 
@@ -701,43 +641,39 @@ function pinNode(d) {
     .attr('y', -cardH / 2 + 12)
     .text('📌');
 
+  const genLabel = d.depth === 0 ? 'Младшее поколение' : `${d.depth}-е поколение от младшего`;
+  const genderLabel = d.data.gender === 'male' ? 'Мужской' : 'Женский';
+  const generatedLabel = d.data.isGenerated ? '<div class="row" style="color:#a06bff">✨ Восстановлено по роду</div>' : '';
+  const displayName = d.data.name || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
+
+  let linkHtml = '';
   if (d.data.link && d.data.link.trim().length > 0) {
-    const btnWidth = 100;
-    const btnHeight = 22;
-
-    const linkBtn = targetNode.append('g')
-      .attr('class', 'link-button')
-      .attr('transform', `translate(${cardW / 2 - 20}, ${cardH / 2 + 20})`);
-
-    linkBtn.append('rect')
-      .attr('x', -btnWidth / 2)
-      .attr('y', -btnHeight / 2)
-      .attr('width', btnWidth)
-      .attr('height', btnHeight)
-      .attr('rx', 8);
-
-    linkBtn.append('text')
-      .attr('x', 0)
-      .attr('y', 1)
-      .text('🔗 Открыть');
-
-    linkBtn.on('click', (event) => {
-      event.stopPropagation();
-      window.open(d.data.link, '_blank', 'noopener,noreferrer');
-    });
+    linkHtml = `<button class="btn-open-link" onclick="window.open('${d.data.link}', '_blank', 'noopener,noreferrer')">🔗 Открыть ссылку</button>`;
   }
+
+  const screenX = width / 2 + (d.x + offsetX - width / 2);
+  const screenY = height / 2 + (d.y + offsetY - height / 2);
+
+  tooltip
+    .style('opacity', 1)
+    .html(`
+      <strong>${displayName}</strong>
+      <div class="row">Дата рождения: <span>${d.data.birth || 'неизвестна'}</span></div>
+      <div class="row">Поколение: <span>${genLabel}</span></div>
+      <div class="row">Пол: <span>${genderLabel}</span></div>
+      ${generatedLabel}
+      ${linkHtml}
+    `)
+    .style('left', Math.min(screenX + 30, window.innerWidth - 280) + 'px')
+    .style('top', Math.max(screenY - 60, 60) + 'px');
 }
 
 // === СНЯТЬ ЗАКРЕПЛЕНИЕ ===
 function unpinNode(id) {
-  const targetNode = nodeLayer.selectAll('.node')
-    .filter(nd => nd.data.id === id);
-
-  targetNode.select('.card-bg')
-    .classed('pinned', false);
-
-  targetNode.selectAll('.pin-badge, .link-button')
-    .remove();
+  const targetNode = nodeLayer.selectAll('.node').filter(nd => nd.data.id === id);
+  targetNode.select('.card-bg').classed('pinned', false);
+  targetNode.selectAll('.pin-badge').remove();
+  tooltip.style('opacity', 0);
 }
 
 // === ОБРАБОТЧИКИ ===
@@ -748,14 +684,17 @@ function attachNodeHandlers(selection) {
     });
 
     selection.on('mouseover', (event, d) => {
+      if (pinnedNodeId === d.data.id) return;
+
       const genLabel = d.depth === 0 ? 'Младшее поколение' : `${d.depth}-е поколение от младшего`;
       const genderLabel = d.data.gender === 'male' ? 'Мужской' : 'Женский';
-      const generatedLabel = d.data.isGenerated
-        ? '<div class="row" style="color:#a06bff">✨ Восстановлено по роду</div>'
-        : '';
+      const generatedLabel = d.data.isGenerated ? '<div class="row" style="color:#a06bff">✨ Восстановлено по роду</div>' : '';
+      const displayName = d.data.name || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
 
-      const displayName = d.data.name
-        || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
+      let linkHtml = '';
+      if (d.data.link && d.data.link.trim().length > 0) {
+        linkHtml = `<button class="btn-open-link" onclick="window.open('${d.data.link}', '_blank', 'noopener,noreferrer')">🔗 Открыть ссылку</button>`;
+      }
 
       tooltip
         .style('opacity', 1)
@@ -766,23 +705,24 @@ function attachNodeHandlers(selection) {
           <div class="row">Пол: <span>${genderLabel}</span></div>
           ${d.children ? `<div class="row">Предков выше: <span>${d.children.length}</span></div>` : ''}
           ${generatedLabel}
+          ${linkHtml}
         `)
         .style('left', (event.pageX + 15) + 'px')
         .style('top', (event.pageY - 15) + 'px');
     });
 
     selection.on('mousemove', (event) => {
-      tooltip
-        .style('left', (event.pageX + 15) + 'px')
-        .style('top', (event.pageY - 15) + 'px');
+      tooltip.style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
     });
 
     selection.on('mouseout', () => {
-      tooltip.style('opacity', 0);
+      if (!pinnedNodeId) {
+        tooltip.style('opacity', 0);
+      }
     });
   }
 
-  // === CLICK — закрепить/снять ===
+  // === CLICK — закрепить/снять без скачков ===
   selection.on('click', (event, d) => {
     event.stopPropagation();
 
@@ -799,10 +739,9 @@ function attachNodeHandlers(selection) {
     pinNode(d);
     pinnedNodeId = d.data.id;
 
-    // Пауза дыхания на время зума
     pauseBreathingFor(1200);
 
-    // СБРАСЫВАЕМ дыхание мгновенно в 0 для всех узлов при клике (устраняет скачок)
+    // Сбрасываем смещение дыхания в 0 для предотвращения рывков
     nodeLayer.selectAll('.node').attr('transform', function(nodeData) {
       const bX = nodeData.xIdeal !== undefined ? nodeData.xIdeal : nodeData.x;
       const bY = nodeData.yIdeal !== undefined ? nodeData.yIdeal : nodeData.y;
@@ -812,7 +751,6 @@ function attachNodeHandlers(selection) {
 
     const baseX = d.xIdeal !== undefined ? d.xIdeal : d.x;
     const baseY = d.yIdeal !== undefined ? d.yIdeal : d.y;
-
     const scale = IS_MOBILE ? 1.3 : 1.6;
     const x = width / 2 - (baseX + offsetX) * scale;
     const y = height / 2 - (baseY + offsetY) * scale;
@@ -833,7 +771,6 @@ function attachNodeHandlers(selection) {
   });
 }
 
-// === ЧАСТИЦЫ ===
 function spawnParticles(d, count = CONFIG.particles.onHover) {
   if (!CONFIG.particles.enabled) return;
 
@@ -860,7 +797,6 @@ function spawnParticles(d, count = CONFIG.particles.onHover) {
   }
 }
 
-// === ВОЛНА ===
 function animateAncestorWave(node) {
   const ancestors = node.ancestors().reverse();
 
@@ -896,7 +832,6 @@ function animateAncestorWave(node) {
     .classed('dimmed', d => !ancestorIds.has(d.target.data.id));
 }
 
-// === СБРОС ПОДСВЕТКИ ===
 function resetHighlight() {
   nodeLayer.selectAll('.card-bg')
     .classed('highlighted', false)
@@ -913,17 +848,12 @@ function resetHighlight() {
     });
 }
 
-// === УДАЛЕНИЕ СГЕНЕРИРОВАННЫХ ПРЕДКОВ ===
 function clearGeneratedAncestors() {
-  const generatedNodes = nodeLayer.selectAll('.node')
-    .filter(d => d.data.isGenerated);
-
+  const generatedNodes = nodeLayer.selectAll('.node').filter(d => d.data.isGenerated);
   if (generatedNodes.empty()) return;
 
   generatedNodes
-    .transition()
-    .duration(1800)
-    .ease(d3.easeCubicOut)
+    .transition().duration(1800).ease(d3.easeCubicOut)
     .style('opacity', 0)
     .attr('transform', function(d) {
       const { scale } = getGenerationStyle(d.depth);
@@ -931,19 +861,8 @@ function clearGeneratedAncestors() {
       return `translate(${d.x + offsetX}, ${d.y + offsetY}) rotate(${rot}) scale(${scale * 0.2})`;
     });
 
-  linkLayer.selectAll('.link')
-    .filter(d => d.target.data.isGenerated)
-    .transition()
-    .duration(1800)
-    .ease(d3.easeCubicOut)
-    .style('opacity', 0);
-
-  pulseLayer.selectAll('.pulse')
-    .filter(d => d.target.data.isGenerated)
-    .transition()
-    .duration(1800)
-    .ease(d3.easeCubicOut)
-    .attr('opacity', 0);
+  linkLayer.selectAll('.link').filter(d => d.target.data.isGenerated).transition().duration(1800).style('opacity', 0);
+  pulseLayer.selectAll('.pulse').filter(d => d.target.data.isGenerated).transition().duration(1800).attr('opacity', 0);
 
   setTimeout(() => {
     function deepClean(node) {
@@ -955,9 +874,7 @@ function clearGeneratedAncestors() {
     function walkAll(node) {
       if (!node) return;
       deepClean(node);
-      if (node.children) {
-        node.children.forEach(walkAll);
-      }
+      if (node.children) node.children.forEach(walkAll);
     }
 
     walkAll(familyData);
@@ -966,7 +883,6 @@ function clearGeneratedAncestors() {
     (familyData.greatGrandparents || []).forEach(walkAll);
 
     pinnedNodeId = null;
-
     nodeLayer.selectAll('.node').remove();
     linkLayer.selectAll('.link').remove();
     pulseLayer.selectAll('.pulse').remove();
@@ -983,33 +899,25 @@ function clearGeneratedAncestors() {
   }, 1900);
 }
 
-// === ПЕРВИЧНЫЙ РЕНДЕР ===
 renderTree(true);
 
-// === КЛИК ПО ФОНУ ===
 svg.on('click', () => {
   if (pinnedNodeId) {
     unpinNode(pinnedNodeId);
     pinnedNodeId = null;
   }
-
-  svg.transition().duration(CONFIG.duration.zoom)
-    .call(zoom.transform, d3.zoomIdentity);
+  svg.transition().duration(CONFIG.duration.zoom).call(zoom.transform, d3.zoomIdentity);
   resetHighlight();
   tooltip.style('opacity', 0);
 });
 
-// === КНОПКИ ===
 document.getElementById('btn-reset').addEventListener('click', (e) => {
   e.stopPropagation();
-
   if (pinnedNodeId) {
     unpinNode(pinnedNodeId);
     pinnedNodeId = null;
   }
-
-  svg.transition().duration(CONFIG.duration.zoom)
-    .call(zoom.transform, d3.zoomIdentity);
+  svg.transition().duration(CONFIG.duration.zoom).call(zoom.transform, d3.zoomIdentity);
   resetHighlight();
 });
 
@@ -1036,22 +944,19 @@ document.getElementById('btn-toggle-lines').addEventListener('click', function(e
   this.classList.toggle('active', hidden);
 });
 
-// === АДАПТИВНОСТЬ ===
 let resizeTimeout;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimeout);
   resizeTimeout = setTimeout(() => location.reload(), 300);
 });
 
-// === КЛАВИАТУРА ===
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (pinnedNodeId) {
       unpinNode(pinnedNodeId);
       pinnedNodeId = null;
     }
-    svg.transition().duration(CONFIG.duration.zoom)
-      .call(zoom.transform, d3.zoomIdentity);
+    svg.transition().duration(CONFIG.duration.zoom).call(zoom.transform, d3.zoomIdentity);
     resetHighlight();
     tooltip.style('opacity', 0);
   }
@@ -1063,7 +968,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// === ДЫХАНИЕ (только на десктопе) ===
+// === ДЫХАНИЕ ===
 if (CONFIG.breathing.enabled) {
   const startTime = Date.now();
   let zoomActive = false;
@@ -1083,18 +988,14 @@ if (CONFIG.breathing.enabled) {
       nodeLayer.selectAll('.node').attr('transform', function(d) {
         const amp = CONFIG.breathing.baseAmp + d.depth * CONFIG.breathing.ampPerDepth;
         const finalAmp = d.data.isGenerated ? amp * 0.4 : amp;
-
-        const dur = CONFIG.breathing.minDuration +
-                    (hashNoise(d.data.id, 7) + 1) * 
-                    (CONFIG.breathing.maxDuration - CONFIG.breathing.minDuration) / 2;
-
+        const dur = CONFIG.breathing.minDuration + (hashNoise(d.data.id, 7) + 1) * (CONFIG.breathing.maxDuration - CONFIG.breathing.minDuration) / 2;
         const phase = hashNoise(d.data.id, 11) * Math.PI * 2;
         const dy = Math.sin((now - startTime) / dur * Math.PI * 2 + phase) * finalAmp;
 
         const baseX = d.xIdeal !== undefined ? d.xIdeal : d.x;
         const baseY = d.yIdeal !== undefined ? d.yIdeal : d.y;
-        
         const tempD = { ...d, x: baseX, y: baseY };
+
         return nodeTransform(tempD, 0, dy);
       });
     }
