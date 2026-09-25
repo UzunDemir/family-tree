@@ -302,6 +302,66 @@ function getInitials(name) {
   return parts[0] ? parts[0][0].toUpperCase() : '?';
 }
 
+// // === ПОКАЗ ТУЛТИПА С АВТОСКРЫТИЕМ ЧЕРЕЗ ВРЕМЯ ===
+// function showTooltipForNode(d, event) {
+//   clearTimeout(tooltipMaxLifeTimer);
+
+//   const genLabel = d.depth === 0 ? 'Младшее поколение' : `${d.depth}-е поколение от младшего`;
+//   const genderLabel = d.data.gender === 'male' ? 'Мужской' : 'Женский';
+//   const displayName = d.data.name || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
+
+//   tooltip.html('');
+
+//   const content = tooltip.append('div');
+//   content.append('strong').text(displayName);
+//   content.append('div').attr('class', 'row').html(`Дата рождения: <span>${d.data.birth || 'неизвестна'}</span>`);
+//   content.append('div').attr('class', 'row').html(`Поколение: <span>${genLabel}</span>`);
+//   content.append('div').attr('class', 'row').html(`Пол: <span>${genderLabel}</span>`);
+
+//   if (d.data.isGenerated) {
+//     content.append('div').attr('class', 'row').style('color', 'var(--accent-purple)').text('✨ Восстановлено по роду');
+//   }
+
+//   if (d.children && !d.data.isGenerated) {
+//     content.append('div').attr('class', 'row').html(`Предков выше: <span>${d.children.length}</span>`);
+//   }
+
+//   if (d.data.link && d.data.link.trim().length > 0) {
+//     const linkBtn = content.append('button')
+//       .attr('class', 'btn-open-link')
+//       .text('🔗 Открыть ссылку');
+
+//     linkBtn.on('click', (e) => {
+//       e.stopPropagation();
+//       window.open(d.data.link, '_blank', 'noopener,noreferrer');
+//     });
+//   }
+
+//   const screenX = event ? event.pageX + 15 : width / 2;
+//   const screenY = event ? event.pageY - 15 : height / 2;
+
+//   tooltip
+//     .style('opacity', 1)
+//     .style('left', Math.min(screenX, window.innerWidth - 300) + 'px')
+//     .style('top', Math.max(screenY - 80, 60) + 'px');
+
+//   // Плашка всё равно исчезнет через 7 секунд, если её не закрепить или не навести на неё мышь
+//   if (!pinnedNodeId) {
+//     tooltipMaxLifeTimer = setTimeout(() => {
+//       if (!isMouseOverTooltip && !pinnedNodeId) {
+//         tooltip.style('opacity', 0);
+//       }
+//     }, 7000);
+//   }
+
+//   if (IS_MOBILE) {
+//     clearTimeout(window._mobileTooltipTimer);
+//     window._mobileTooltipTimer = setTimeout(() => {
+//       tooltip.style('opacity', 0);
+//     }, 4000);
+//   }
+// }
+
 // === ПОКАЗ ТУЛТИПА С АВТОСКРЫТИЕМ ЧЕРЕЗ ВРЕМЯ ===
 function showTooltipForNode(d, event) {
   clearTimeout(tooltipMaxLifeTimer);
@@ -322,8 +382,12 @@ function showTooltipForNode(d, event) {
     content.append('div').attr('class', 'row').style('color', 'var(--accent-purple)').text('✨ Восстановлено по роду');
   }
 
-  if (d.children && !d.data.isGenerated) {
-    content.append('div').attr('class', 'row').html(`Предков выше: <span>${d.children.length}</span>`);
+  // Исправленный подсчет и формулировка для предков выше
+  if (d.children && d.children.length > 0) {
+    const parentType = d.depth === 0 ? 'Родителей в базе' : 'Предков выше (родителей)';
+    content.append('div').attr('class', 'row').html(`${parentType}: <span>${d.children.length}</span>`);
+  } else if (d.depth > 0 && !d.data.isGenerated) {
+    content.append('div').attr('class', 'row').html(`Предков выше: <span>0 (можно раскрыть)</span>`);
   }
 
   if (d.data.link && d.data.link.trim().length > 0) {
@@ -345,7 +409,6 @@ function showTooltipForNode(d, event) {
     .style('left', Math.min(screenX, window.innerWidth - 300) + 'px')
     .style('top', Math.max(screenY - 80, 60) + 'px');
 
-  // Плашка всё равно исчезнет через 7 секунд, если её не закрепить или не навести на неё мышь
   if (!pinnedNodeId) {
     tooltipMaxLifeTimer = setTimeout(() => {
       if (!isMouseOverTooltip && !pinnedNodeId) {
@@ -361,6 +424,8 @@ function showTooltipForNode(d, event) {
     }, 4000);
   }
 }
+
+
 
 // === ПРОЦЕДУРНАЯ ГЕНЕРАЦИЯ ПРЕДКОВ ===
 const IR = CONFIG.infiniteRoots;
