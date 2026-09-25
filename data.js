@@ -28,7 +28,7 @@ let familyData = {
     { id: "nikolay",   name: "Узун Николай",      birth: "24.02.1945", gender: "male",   generation: 2, side: "father", link: "https://www.facebook.com/nicolai.uzun" },
     { id: "olga",      name: "Белиогло Ольга",    birth: "06.08.1950", gender: "female", generation: 2, side: "father", link: "https://www.facebook.com/uzunolya" },
     { id: "alexander", name: "Симонов Александр", birth: "07.12.1958", gender: "male",   generation: 2, side: "mother" },
-    { id: "nina",      name: "Цугуй Нина",        birth: "21.01.1958", gender: "female", generation: 2, side: "mother" }
+    { id: "nina",      name: "Цугуй Нина",        birth: "21.01.1958", gender: "female", generation: 2, side: "mother", link: "https://www.facebook.com/nina.simonov.5" }
   ],
 
   greatGrandparents: [
