@@ -384,10 +384,10 @@ function showTooltipForNode(d, event) {
 
   // Исправленный подсчет и формулировка для предков выше
   if (d.children && d.children.length > 0) {
-    const parentType = d.depth === 0 ? 'Родителей в базе' : 'Предков выше (родителей)';
+    const parentType = d.depth === 0 ? 'Родителей в базе' : 'Предков  (родителей)';
     content.append('div').attr('class', 'row').html(`${parentType}: <span>${d.children.length}</span>`);
   } else if (d.depth > 0 && !d.data.isGenerated) {
-    content.append('div').attr('class', 'row').html(`Предков выше: <span>0 (можно раскрыть)</span>`);
+    content.append('div').attr('class', 'row').html(`Предков: <span>0 (можно раскрыть)</span>`);
   }
 
   if (d.data.link && d.data.link.trim().length > 0) {
