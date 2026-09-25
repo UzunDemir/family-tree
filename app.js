@@ -1029,6 +1029,21 @@
  *   - Клик = закрепить/снять рамку + Facebook-ссылка
  */
 
+/**
+ * Семейное древо Узун — D3.js + бесконечные корни
+ * Адаптив: монитор / планшет / телефон
+ * 
+ * Правила:
+ *   - ЛЮБОЙ узел ВСЕГДА ниже родителя
+ *   - Сгенерированные узлы БЕЗ имён
+ *   - Связи — вертикальные S-кривые, известные — короче
+ *   - Карточки НЕ наезжают друг на друга
+ *   - Яркие пульсы для реальных, тусклые для сгенерированных
+ *   - Кнопка «Сброс рода» — медленное исчезновение
+ *   - Дерево центрируется по корню (Демир)
+ *   - Клик = закрепить + кнопка 🔗 Открыть (если есть link)
+ */
+
 // ============================================
 // === ОПРЕДЕЛЯЕМ УСТРОЙСТВО ===
 // ============================================
@@ -1167,7 +1182,6 @@ const JITTER = {
   rotateByDepth: IS_MOBILE ? [0, 0.5, 1, 1.5] : [0, 1, 2, 3]
 };
 
-// ⬇️ УМЕНЬШЕНЫ — короче связи известных
 const GENERATION_STEP_Y = IS_MOBILE ? 60 : 70;
 const GENERATION_STEP_Y_MIN = IS_MOBILE ? 45 : 50;
 const PARENT_SIDE_OFFSET = IS_MOBILE ? 12 : 15;
@@ -1224,7 +1238,6 @@ function adjustAllPositions(root) {
   realNodes.forEach(node => {
     const depth = Math.min(node.depth, JITTER.yByDepth.length - 1);
 
-    // УМЕНЬШЕН вдвое — короче связи
     const yJitter = Math.abs(hashNoise(node.data.id, 2)) * JITTER.yByDepth[depth] * 0.5;
     node.y += yJitter;
 
@@ -1277,7 +1290,6 @@ adjustAllPositions(root);
 function centerRoot() {
   const rootX = root.x;
   offsetX = width / 2 - rootX;
-
   console.log(`📐 Центрирование: root.x = ${rootX.toFixed(1)}, offsetX = ${offsetX.toFixed(1)}`);
 }
 
@@ -1377,6 +1389,7 @@ function generateAncestor(childId, childBirth, childGeneration, side) {
     gender,
     generation: childGeneration + 1,
     isGenerated: true,
+    link: null,
     children: []
   };
 }
@@ -1703,10 +1716,10 @@ function pinNode(d) {
     .select('.card-bg')
     .classed('pinned', true);
 
-  // Если уже есть бейдж или FB-кнопка — удаляем
+  // Убираем старые бейдж/кнопку
   nodeLayer.selectAll('.node')
     .filter(nd => nd.data.id === d.data.id)
-    .selectAll('.pin-badge, .fb-button')
+    .selectAll('.pin-badge, .link-button')
     .remove();
 
   const targetNode = nodeLayer.selectAll('.node')
@@ -1715,38 +1728,37 @@ function pinNode(d) {
   const cardW = CONFIG.cardWidth;
   const cardH = CONFIG.cardHeight;
 
-  // Бейдж «закреплено» — правый верхний угол
+  // Бейдж «закреплено»
   targetNode.append('text')
     .attr('class', 'pin-badge')
     .attr('x', cardW / 2 - 12)
     .attr('y', -cardH / 2 + 12)
     .text('📌');
 
-  // Кнопка Facebook — внизу справа, если у узла есть имя
-  if (d.data.name && !d.data.isGenerated) {
-    const fbBtn = targetNode.append('g')
-      .attr('class', 'fb-button')
-      .attr('transform', `translate(${cardW / 2 - 20}, ${cardH / 2 + 18})`);
+  // === КНОПКА-ССЫЛКА (если есть link) ===
+  if (d.data.link && d.data.link.trim().length > 0) {
+    const btnWidth = 100;
+    const btnHeight = 22;
 
-    fbBtn.append('rect')
-      .attr('x', -38)
-      .attr('y', -10)
-      .attr('width', 76)
-      .attr('height', 20)
-      .attr('rx', 6);
+    const linkBtn = targetNode.append('g')
+      .attr('class', 'link-button')
+      .attr('transform', `translate(${cardW / 2 - 20}, ${cardH / 2 + 20})`);
 
-    fbBtn.append('text')
+    linkBtn.append('rect')
+      .attr('x', -btnWidth / 2)
+      .attr('y', -btnHeight / 2)
+      .attr('width', btnWidth)
+      .attr('height', btnHeight)
+      .attr('rx', 8);
+
+    linkBtn.append('text')
       .attr('x', 0)
-      .attr('y', 0)
-      .text('📘 Facebook');
+      .attr('y', 1)
+      .text('🔗 Открыть');
 
-    fbBtn.on('click', (event) => {
+    linkBtn.on('click', (event) => {
       event.stopPropagation();
-
-      const query = encodeURIComponent(d.data.name);
-      const url = `https://www.facebook.com/search/top?q=${query}`;
-
-      window.open(url, '_blank', 'noopener,noreferrer');
+      window.open(d.data.link, '_blank', 'noopener,noreferrer');
     });
   }
 }
@@ -1759,7 +1771,7 @@ function unpinNode(id) {
   targetNode.select('.card-bg')
     .classed('pinned', false);
 
-  targetNode.selectAll('.pin-badge, .fb-button')
+  targetNode.selectAll('.pin-badge, .link-button')
     .remove();
 }
 
@@ -1809,23 +1821,19 @@ function attachNodeHandlers(selection) {
   selection.on('click', (event, d) => {
     event.stopPropagation();
 
-    // Если кликнули на уже закреплённую — снимаем
     if (pinnedNodeId === d.data.id) {
       unpinNode(d.data.id);
       pinnedNodeId = null;
       return;
     }
 
-    // Снимаем предыдущую
     if (pinnedNodeId) {
       unpinNode(pinnedNodeId);
     }
 
-    // Закрепляем новую
     pinNode(d);
     pinnedNodeId = d.data.id;
 
-    // Зум к узлу
     const scale = IS_MOBILE ? 1.3 : 1.6;
     const x = width / 2 - (d.x + offsetX) * scale;
     const y = height / 2 - (d.y + offsetY) * scale;
@@ -1993,7 +2001,6 @@ function clearGeneratedAncestors() {
 
     console.log('🔄 Пересобираю дерево...');
 
-    // Снимаем закрепление перед удалением
     pinnedNodeId = null;
 
     nodeLayer.selectAll('.node').remove();
@@ -2022,7 +2029,6 @@ renderTree(true);
 
 // === КЛИК ПО ФОНУ ===
 svg.on('click', () => {
-  // Снимаем закрепление
   if (pinnedNodeId) {
     unpinNode(pinnedNodeId);
     pinnedNodeId = null;
