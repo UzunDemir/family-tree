@@ -1,3 +1,15 @@
+:root {
+  --bg-gradient: radial-gradient(ellipse at center, #12122a 0%, #05050f 100%);
+  --card-bg: rgba(26, 26, 46, 0.95);
+  --card-border: #2a2a4a;
+  --card-hover: #4a9eff;
+  --text-main: #e0e0ff;
+  --text-muted: #6b6b8a;
+  --accent-purple: #a06bff;
+  --accent-blue: #4a9eff;
+  --glass-blur: blur(12px);
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
@@ -5,8 +17,8 @@ html, body {
   height: 100%;
   overflow: hidden;
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  background: radial-gradient(ellipse at center, #12122a 0%, #05050f 100%);
-  color: #e0e0ff;
+  background: var(--bg-gradient);
+  color: var(--text-main);
   -webkit-tap-highlight-color: transparent;
   touch-action: none;
 }
@@ -15,16 +27,16 @@ html, body {
 #header {
   position: absolute;
   top: 0; left: 0; right: 0;
-  padding: 20px 30px;
+  padding: 24px 32px;
   z-index: 10;
   pointer-events: none;
 }
 
 #header h1 {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  background: linear-gradient(90deg, #4a9eff, #a06bff);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -32,8 +44,8 @@ html, body {
 
 #header .subtitle {
   font-size: 12px;
-  color: #6b6b8a;
-  margin-top: 4px;
+  color: var(--text-muted);
+  margin-top: 6px;
 }
 
 /* === КОНТЕЙНЕР === */
@@ -56,42 +68,42 @@ html, body {
 .node { cursor: pointer; }
 
 .card-bg {
-  fill: #1a1a2e;
-  stroke: #2a2a4a;
-  stroke-width: 1;
-  transition: stroke 0.3s, stroke-width 0.3s, fill 0.3s, filter 0.3s;
+  fill: var(--card-bg);
+  stroke: var(--card-border);
+  stroke-width: 1.2;
+  backdrop-filter: var(--glass-blur);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .node:hover .card-bg {
-  stroke: #4a9eff;
+  stroke: var(--accent-blue);
   stroke-width: 2;
   fill: #1e1e3a;
-  filter: drop-shadow(0 0 8px rgba(74, 158, 255, 0.6));
+  filter: drop-shadow(0 0 12px rgba(74, 158, 255, 0.5));
 }
 
 .card-bg.highlighted {
-  stroke: #4a9eff !important;
+  stroke: var(--accent-blue) !important;
   stroke-width: 2.5 !important;
   fill: #1e1e3a !important;
-  filter: drop-shadow(0 0 10px rgba(74, 158, 255, 0.7));
+  filter: drop-shadow(0 0 14px rgba(74, 158, 255, 0.7));
 }
 
 .card-bg.root-highlighted {
-  stroke: #a06bff !important;
+  stroke: var(--accent-purple) !important;
   stroke-width: 3 !important;
-  filter: drop-shadow(0 0 12px rgba(160, 107, 255, 0.8));
+  filter: drop-shadow(0 0 16px rgba(160, 107, 255, 0.8));
 }
 
-/* === ЗАКРЕПЛЁННАЯ КАРТОЧКА === */
 .card-bg.pinned {
-  stroke: #a06bff !important;
+  stroke: var(--accent-purple) !important;
   stroke-width: 3 !important;
-  filter: drop-shadow(0 0 16px rgba(160, 107, 255, 0.9));
+  filter: drop-shadow(0 0 20px rgba(160, 107, 255, 0.9));
   fill: #1e1e3a !important;
 }
 
 .pin-badge {
-  fill: #a06bff;
+  fill: var(--accent-purple);
   font-size: 14px;
   text-anchor: middle;
   dominant-baseline: central;
@@ -100,14 +112,14 @@ html, body {
 
 /* === ТЕКСТ КАРТОЧКИ === */
 .card-name {
-  fill: #e0e0ff;
+  fill: var(--text-main);
   font-weight: 600;
   pointer-events: none;
   font-size: 13px;
 }
 
 .card-date {
-  fill: #6b6b8a;
+  fill: var(--text-muted);
   pointer-events: none;
   font-size: 11px;
 }
@@ -127,7 +139,7 @@ html, body {
   font-size: 15px;
 }
 
-.avatar-circle.male { fill: #1e3a5f; stroke: #4a9eff; }
+.avatar-circle.male { fill: #1e3a5f; stroke: var(--accent-blue); }
 .avatar-circle.female { fill: #4a1e3f; stroke: #ff6bb0; }
 .avatar-circle.male + .avatar-text { fill: #8ac4ff; }
 .avatar-circle.female + .avatar-text { fill: #ffa0d0; }
@@ -135,13 +147,13 @@ html, body {
 /* === СВЯЗИ === */
 .link {
   fill: none;
-  stroke: #2a2a4a;
+  stroke: var(--card-border);
   stroke-width: 1.5;
   transition: stroke 0.3s, stroke-width 0.3s;
 }
 
 .link.highlighted {
-  stroke: #4a9eff !important;
+  stroke: var(--accent-blue) !important;
   stroke-width: 2.5 !important;
   filter: drop-shadow(0 0 6px rgba(74, 158, 255, 0.6));
 }
@@ -150,64 +162,71 @@ html, body {
   stroke: rgba(42, 42, 74, 0.15) !important;
 }
 
-/* === ТУЛТИП === */
+/* === СОВРЕМЕННЫЙ ТУЛТИП === */
 .tooltip {
   position: absolute;
-  background: rgba(26, 26, 46, 0.98);
-  border: 1px solid #4a9eff;
-  border-radius: 10px;
-  padding: 14px 18px;
-  color: #e0e0ff;
+  background: var(--card-bg);
+  border: 1px solid var(--accent-blue);
+  border-radius: 14px;
+  padding: 16px 20px;
+  color: var(--text-main);
   font-size: 13px;
   opacity: 0;
-  transition: opacity 0.2s;
-  box-shadow: 0 8px 32px rgba(74, 158, 255, 0.3);
+  pointer-events: auto;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(74, 158, 255, 0.2);
+  backdrop-filter: var(--glass-blur);
   z-index: 100;
-  max-width: 260px;
+  max-width: 280px;
 }
 
 .tooltip strong {
   display: block;
-  font-size: 15px;
-  margin-bottom: 6px;
-  color: #4a9eff;
+  font-size: 16px;
+  margin-bottom: 8px;
+  color: var(--accent-blue);
 }
 
 .tooltip .row {
-  color: #a0a0c0;
+  color: var(--text-muted);
   font-size: 12px;
-  margin-top: 3px;
+  margin-top: 4px;
 }
 
-.tooltip .row span { color: #e0e0ff; }
+.tooltip .row span { color: var(--text-main); }
 
 /* === КНОПКА ОТКРЫТЬ В ТУЛТИПЕ === */
 .tooltip .btn-open-link {
   display: block;
   width: 100%;
-  margin-top: 10px;
-  background: #4a9eff;
+  margin-top: 12px;
+  background: linear-gradient(135deg, var(--accent-blue), #3b82f6);
   color: #ffffff;
   border: none;
-  padding: 8px 12px;
-  border-radius: 6px;
+  padding: 10px 14px;
+  border-radius: 8px;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   text-align: center;
-  transition: background 0.2s, filter 0.2s;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
 }
 
 .tooltip .btn-open-link:hover {
-  background: #6bb0ff;
-  filter: drop-shadow(0 0 8px rgba(74, 158, 255, 0.8));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(74, 158, 255, 0.5);
+}
+
+.tooltip .btn-open-link:active {
+  transform: scale(0.97);
 }
 
 /* === КНОПКИ УПРАВЛЕНИЯ === */
 #controls {
   position: absolute;
-  right: 24px;
-  bottom: 80px;
+  right: 28px;
+  bottom: 90px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -215,23 +234,28 @@ html, body {
 }
 
 #controls button {
-  background: rgba(26, 26, 46, 0.9);
-  border: 1px solid #2a2a4a;
-  color: #a0a0c0;
-  padding: 10px 14px;
-  border-radius: 10px;
-  font-size: 13px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s;
-  backdrop-filter: blur(10px);
-  min-width: 44px;
-  user-select: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: var(--glass-blur);
+  min-width: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
 }
 
 #controls button:hover {
-  border-color: #4a9eff;
-  color: #4a9eff;
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
   transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(74, 158, 255, 0.2);
 }
 
 #controls button:active {
@@ -239,78 +263,38 @@ html, body {
 }
 
 #controls button.active {
-  border-color: #4a9eff;
-  color: #4a9eff;
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
   background: rgba(74, 158, 255, 0.15);
 }
 
 #controls button#btn-clear-generated:hover {
-  border-color: #a06bff;
-  color: #a06bff;
+  border-color: var(--accent-purple);
+  color: var(--accent-purple);
 }
 
 /* === ФУТЕР === */
 #footer {
   position: absolute;
-  bottom: 20px;
-  left: 30px;
+  bottom: 24px;
+  left: 32px;
   font-size: 12px;
-  color: #4a4a6a;
+  color: var(--text-muted);
   z-index: 10;
 }
 
-/* === ПУЛЬСЫ И ЧАСТИЦЫ === */
-.pulse-layer circle,
-.particle-layer circle {
-  pointer-events: none;
-}
-
-.pulse-layer circle {
-  mix-blend-mode: screen;
-}
-
-/* ============================================
-   === МОБИЛЬНАЯ ВЕРСИЯ ===
-   ============================================ */
+/* === АДАПТИВ === */
 @media (max-width: 768px) {
-  #header { padding: 12px 16px; }
-  #header h1 { font-size: 16px; }
+  #header { padding: 16px 20px; }
+  #header h1 { font-size: 18px; }
   #header .subtitle { display: none; }
 
   #controls {
-    right: 0;
-    left: 0;
-    bottom: 55px;
-    flex-direction: row;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 0 12px;
+    right: 0; left: 0; bottom: 60px;
+    flex-direction: row; justify-content: center;
+    gap: 8px; padding: 0 16px;
   }
 
-  #controls button {
-    padding: 8px 10px;
-    font-size: 11px;
-    min-width: auto;
-    border-radius: 8px;
-  }
-
-  #footer {
-    left: 16px;
-    bottom: 12px;
-    font-size: 10px;
-  }
-
-  .tooltip {
-    max-width: 240px;
-    font-size: 12px;
-    padding: 12px 14px;
-  }
-
-  .tooltip strong { font-size: 14px; }
-  .tooltip .row { font-size: 11px; }
-
-  .card-name { font-size: 11px !important; }
-  .card-date { font-size: 9px !important; }
-  .avatar-text { font-size: 13px !important; }
+  #controls button { padding: 10px; min-width: 42px; min-height: 42px; border-radius: 10px; }
+  #footer { left: 20px; bottom: 16px; font-size: 11px; }
 }
