@@ -12,7 +12,7 @@ let familyData = {
   gender: "male",
   generation: 0,
   children: [],
-  link: "https://facebook.com/",
+  link: "https://www.facebook.com/demir.uzun.35/",
 
   parents: [
     { 
