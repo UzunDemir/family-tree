@@ -20,7 +20,8 @@ let familyData = {
       link: "https://www.facebook.com/demir.uzun.35"
     },
     { 
-      id: "natalia", name: "Симонова Наталья", birth: "26.02.1982", gender: "female", generation: 1
+      id: "natalia", name: "Симонова Наталья", birth: "26.02.1982", gender: "female", generation: 1,
+      link: "https://www.facebook.com/natalia.uzun.220202"
     }
   ],
 
