@@ -82,15 +82,64 @@ html, body {
   filter: drop-shadow(0 0 12px rgba(160, 107, 255, 0.8));
 }
 
+/* === ЗАКРЕПЛЁННАЯ КАРТОЧКА === */
+.card-bg.pinned {
+  stroke: #a06bff !important;
+  stroke-width: 3 !important;
+  filter: drop-shadow(0 0 16px rgba(160, 107, 255, 0.9));
+  fill: #1e1e3a !important;
+}
+
+/* Метка «закреплено» в углу */
+.pin-badge {
+  fill: #a06bff;
+  font-size: 14px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+/* === КНОПКА FACEBOOK === */
+.fb-button {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fb-button:hover {
+  filter: drop-shadow(0 0 8px rgba(74, 158, 255, 0.9));
+}
+
+.fb-button rect {
+  fill: #1877f2;
+  stroke: #4a9eff;
+  stroke-width: 1;
+}
+
+.fb-button:hover rect {
+  fill: #0d6efd;
+}
+
+.fb-button text {
+  fill: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+/* === ТЕКСТ КАРТОЧКИ — КРУПНЕЕ === */
 .card-name {
   fill: #e0e0ff;
   font-weight: 600;
   pointer-events: none;
+  font-size: 13px;
 }
 
 .card-date {
   fill: #6b6b8a;
   pointer-events: none;
+  font-size: 11px;
 }
 
 .avatar-circle {
@@ -105,6 +154,7 @@ html, body {
   text-anchor: middle;
   dominant-baseline: central;
   pointer-events: none;
+  font-size: 15px;
 }
 
 .avatar-circle.male { fill: #1e3a5f; stroke: #4a9eff; }
@@ -232,17 +282,9 @@ html, body {
    === МОБИЛЬНАЯ ВЕРСИЯ ===
    ============================================ */
 @media (max-width: 768px) {
-  #header {
-    padding: 12px 16px;
-  }
-
-  #header h1 {
-    font-size: 16px;
-  }
-
-  #header .subtitle {
-    display: none;
-  }
+  #header { padding: 12px 16px; }
+  #header h1 { font-size: 16px; }
+  #header .subtitle { display: none; }
 
   #controls {
     right: 0;
@@ -274,16 +316,15 @@ html, body {
     padding: 12px 14px;
   }
 
-  .tooltip strong {
-    font-size: 14px;
-  }
+  .tooltip strong { font-size: 14px; }
+  .tooltip .row { font-size: 11px; }
 
-  .tooltip .row {
-    font-size: 11px;
-  }
+  /* Крупнее, чем дефолт-адаптив */
+  .card-name { font-size: 11px !important; }
+  .card-date { font-size: 9px !important; }
+  .avatar-text { font-size: 13px !important; }
 }
 
-/* Очень узкие экраны */
 @media (max-width: 400px) {
   #header h1 { font-size: 14px; }
 
@@ -297,20 +338,16 @@ html, body {
     font-size: 10px;
   }
 
-  #footer {
-    font-size: 9px;
-  }
+  #footer { font-size: 9px; }
+
+  .card-name { font-size: 10px !important; }
+  .card-date { font-size: 8px !important; }
+  .avatar-text { font-size: 12px !important; }
 }
 
-/* Альбомная ориентация на телефоне */
 @media (max-height: 500px) and (orientation: landscape) {
-  #header {
-    padding: 8px 16px;
-  }
-
-  #header h1 {
-    font-size: 14px;
-  }
+  #header { padding: 8px 16px; }
+  #header h1 { font-size: 14px; }
 
   #controls {
     right: 12px;
