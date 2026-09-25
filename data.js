@@ -17,7 +17,7 @@ let familyData = {
   parents: [
     { 
       id: "vitaliy", name: "Узун Виталий", birth: "02.12.1974", gender: "male", generation: 1,
-      link: "https://instagram.com/"
+      link: "https://www.facebook.com/demir.uzun.35"
     },
     { 
       id: "natalia", name: "Симонова Наталья", birth: "26.02.1982", gender: "female", generation: 1
@@ -26,7 +26,7 @@ let familyData = {
 
   grandparents: [
     { id: "nikolay",   name: "Узун Николай",      birth: "24.02.1945", gender: "male",   generation: 2, side: "father", link: "https://www.facebook.com/nicolai.uzun" },
-    { id: "olga",      name: "Белиогло Ольга",    birth: "06.08.1950", gender: "female", generation: 2, side: "father" },
+    { id: "olga",      name: "Белиогло Ольга",    birth: "06.08.1950", gender: "female", generation: 2, side: "father", link: "https://www.facebook.com/uzunolya" },
     { id: "alexander", name: "Симонов Александр", birth: "07.12.1958", gender: "male",   generation: 2, side: "mother" },
     { id: "nina",      name: "Цугуй Нина",        birth: "21.01.1958", gender: "female", generation: 2, side: "mother" }
   ],
