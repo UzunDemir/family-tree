@@ -1,11 +1,8 @@
 /**
  * Семейное древо Узун — D3.js + бесконечные корни
- * Адаптив: монитор / планшет / телефон
+ * Безопасная версия с современным DOM/D3 рендерингом тултипов
  */
 
-// ============================================
-// === ОПРЕДЕЛЯЕМ УСТРОЙСТВО ===
-// ============================================
 const IS_MOBILE = window.innerWidth < 768;
 const IS_SMALL_MOBILE = window.innerWidth < 400;
 
@@ -16,7 +13,6 @@ const FONT_NAME = IS_SMALL_MOBILE ? '10px' : (IS_MOBILE ? '11px' : '13px');
 const FONT_DATE = IS_SMALL_MOBILE ? '8px' : (IS_MOBILE ? '9px' : '11px');
 const FONT_AVATAR = IS_SMALL_MOBILE ? '12px' : (IS_MOBILE ? '13px' : '15px');
 
-// === КОНФИГУРАЦИЯ ===
 const CONFIG = {
   cardWidth: CARD_W,
   cardHeight: CARD_H,
@@ -57,7 +53,6 @@ const CONFIG = {
   }
 };
 
-// === ИНИЦИАЛИЗАЦИЯ ===
 const container = document.getElementById('tree-container');
 const tooltip = d3.select('#tooltip');
 const width = window.innerWidth;
@@ -87,7 +82,6 @@ const particleLayer = g.append('g').attr('class', 'particle-layer');
 let offsetX = width / 2;
 const offsetY = IS_MOBILE ? height * 0.06 : height * 0.1;
 
-// === ЗУМ ===
 const zoom = d3.zoom()
   .scaleExtent([0.15, 3])
   .on('zoom', (event) => {
@@ -99,7 +93,6 @@ const zoom = d3.zoom()
 
 svg.call(zoom);
 
-// === НАЧАЛЬНЫЙ ЗУМ ===
 const initialScale = IS_MOBILE ? 0.7 : 1;
 const initialTX = IS_MOBILE ? width * 0.15 : 0;
 const initialTY = IS_MOBILE ? height * 0.05 : 0;
@@ -109,7 +102,6 @@ svg.call(zoom.transform, d3.zoomIdentity
   .scale(initialScale)
 );
 
-// === ПОСТРОЕНИЕ ===
 let root = d3.hierarchy(buildHierarchy(familyData));
 
 const CARD_MIN_DX = CONFIG.cardWidth + (IS_MOBILE ? 20 : 40);
@@ -126,7 +118,6 @@ const treeLayout = d3.tree()
 
 treeLayout(root);
 
-// === ШУМ ===
 function hashNoise(id, seed = 0) {
   let h = seed;
   for (let i = 0; i < id.length; i++) {
@@ -135,7 +126,6 @@ function hashNoise(id, seed = 0) {
   return ((h % 1000) / 1000) * 2 - 1;
 }
 
-// === JITTER ===
 const JITTER = {
   yByDepth:      IS_MOBILE ? [8, 12, 15, 20] : [15, 22, 30, 40],
   rotateByDepth: IS_MOBILE ? [0, 0.5, 1, 1.5] : [0, 1, 2, 3]
@@ -145,10 +135,7 @@ const GENERATION_STEP_Y = IS_MOBILE ? 60 : 70;
 const GENERATION_STEP_Y_MIN = IS_MOBILE ? 45 : 50;
 const PARENT_SIDE_OFFSET = IS_MOBILE ? 12 : 15;
 
-// === ЗАКРЕПЛЁННАЯ КАРТОЧКА ===
 let pinnedNodeId = null;
-
-// === ПАУЗА ДЫХАНИЯ ===
 let breathingPaused = false;
 let breathingResumeTimer = null;
 
@@ -292,43 +279,56 @@ function getInitials(name) {
   return parts[0] ? parts[0][0].toUpperCase() : '?';
 }
 
-// === ТУЛТИП И КНОПКА ОТКРЫТЬ ===
-function showMobileTooltip(d, event) {
+// === БЕЗОПАСНЫЙ ПОКАЗ ТУЛТИПА С КНОПКОЙ ОТКРЫТЬ ===
+function showTooltipForNode(d, event) {
   const genLabel = d.depth === 0 ? 'Младшее поколение' : `${d.depth}-е поколение от младшего`;
   const genderLabel = d.data.gender === 'male' ? 'Мужской' : 'Женский';
-  const generatedLabel = d.data.isGenerated
-    ? '<div class="row" style="color:#a06bff">✨ Восстановлено по роду</div>'
-    : '';
-
   const displayName = d.data.name || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
 
-  let linkHtml = '';
-  if (d.data.link && d.data.link.trim().length > 0) {
-    linkHtml = `<button class="btn-open-link" onclick="window.open('${d.data.link}', '_blank', 'noopener,noreferrer')">🔗 Открыть ссылку</button>`;
+  tooltip.html('');
+
+  const content = tooltip.append('div');
+  content.append('strong').text(displayName);
+  content.append('div').attr('class', 'row').html(`Дата рождения: <span>${d.data.birth || 'неизвестна'}</span>`);
+  content.append('div').attr('class', 'row').html(`Поколение: <span>${genLabel}</span>`);
+  content.append('div').attr('class', 'row').html(`Пол: <span>${genderLabel}</span>`);
+
+  if (d.data.isGenerated) {
+    content.append('div').attr('class', 'row').style('color', 'var(--accent-purple)').text('✨ Восстановлено по роду');
   }
+
+  if (d.children && !d.data.isGenerated) {
+    content.append('div').attr('class', 'row').html(`Предков выше: <span>${d.children.length}</span>`);
+  }
+
+  if (d.data.link && d.data.link.trim().length > 0) {
+    const linkBtn = content.append('button')
+      .attr('class', 'btn-open-link')
+      .text('🔗 Открыть ссылку');
+
+    linkBtn.on('click', (e) => {
+      e.stopPropagation();
+      window.open(d.data.link, '_blank', 'noopener,noreferrer');
+    });
+  }
+
+  const screenX = event ? event.pageX + 15 : width / 2;
+  const screenY = event ? event.pageY - 15 : height / 2;
 
   tooltip
     .style('opacity', 1)
-    .html(`
-      <strong>${displayName}</strong>
-      <div class="row">Дата рождения: <span>${d.data.birth || 'неизвестна'}</span></div>
-      <div class="row">Поколение: <span>${genLabel}</span></div>
-      <div class="row">Пол: <span>${genderLabel}</span></div>
-      ${generatedLabel}
-      ${linkHtml}
-    `)
-    .style('left', Math.min(event.pageX + 15, window.innerWidth - 260) + 'px')
-    .style('top', Math.max(event.pageY - 120, 60) + 'px');
+    .style('left', Math.min(screenX, window.innerWidth - 300) + 'px')
+    .style('top', Math.max(screenY - 80, 60) + 'px');
 
-  clearTimeout(window._mobileTooltipTimer);
-  window._mobileTooltipTimer = setTimeout(() => {
-    tooltip.style('opacity', 0);
-  }, 4000);
+  if (IS_MOBILE) {
+    clearTimeout(window._mobileTooltipTimer);
+    window._mobileTooltipTimer = setTimeout(() => {
+      tooltip.style('opacity', 0);
+    }, 4000);
+  }
 }
 
-// ============================================
 // === ПРОЦЕДУРНАЯ ГЕНЕРАЦИЯ ПРЕДКОВ ===
-// ============================================
 const IR = CONFIG.infiniteRoots;
 
 function generateAncestor(childId, childBirth, childGeneration, side) {
@@ -458,9 +458,7 @@ function showDepthStatus() {
   }
 }
 
-// ============================================
-// === РЕНДЕР ===
-// ============================================
+// === РЕНДЕР ДРЕВА ===
 let links = linkLayer.selectAll('.link');
 let nodes = nodeLayer.selectAll('.node');
 let pulses = pulseLayer.selectAll('.pulse');
@@ -626,7 +624,7 @@ if (CONFIG.pulse.enabled) {
   animatePulses();
 }
 
-// === ЗАКРЕПИТЬ УЗЕЛ ===
+// === ЗАКРЕПЛЕНИЕ УЗЛА ===
 function pinNode(d) {
   nodeLayer.selectAll('.node').filter(nd => nd.data.id === d.data.id).select('.card-bg').classed('pinned', true);
   nodeLayer.selectAll('.node').filter(nd => nd.data.id === d.data.id).selectAll('.pin-badge').remove();
@@ -641,34 +639,12 @@ function pinNode(d) {
     .attr('y', -cardH / 2 + 12)
     .text('📌');
 
-  const genLabel = d.depth === 0 ? 'Младшее поколение' : `${d.depth}-е поколение от младшего`;
-  const genderLabel = d.data.gender === 'male' ? 'Мужской' : 'Женский';
-  const generatedLabel = d.data.isGenerated ? '<div class="row" style="color:#a06bff">✨ Восстановлено по роду</div>' : '';
-  const displayName = d.data.name || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
-
-  let linkHtml = '';
-  if (d.data.link && d.data.link.trim().length > 0) {
-    linkHtml = `<button class="btn-open-link" onclick="window.open('${d.data.link}', '_blank', 'noopener,noreferrer')">🔗 Открыть ссылку</button>`;
-  }
-
   const screenX = width / 2 + (d.x + offsetX - width / 2);
   const screenY = height / 2 + (d.y + offsetY - height / 2);
 
-  tooltip
-    .style('opacity', 1)
-    .html(`
-      <strong>${displayName}</strong>
-      <div class="row">Дата рождения: <span>${d.data.birth || 'неизвестна'}</span></div>
-      <div class="row">Поколение: <span>${genLabel}</span></div>
-      <div class="row">Пол: <span>${genderLabel}</span></div>
-      ${generatedLabel}
-      ${linkHtml}
-    `)
-    .style('left', Math.min(screenX + 30, window.innerWidth - 280) + 'px')
-    .style('top', Math.max(screenY - 60, 60) + 'px');
+  showTooltipForNode(d, { pageX: screenX + 15, pageY: screenY });
 }
 
-// === СНЯТЬ ЗАКРЕПЛЕНИЕ ===
 function unpinNode(id) {
   const targetNode = nodeLayer.selectAll('.node').filter(nd => nd.data.id === id);
   targetNode.select('.card-bg').classed('pinned', false);
@@ -676,7 +652,7 @@ function unpinNode(id) {
   tooltip.style('opacity', 0);
 }
 
-// === ОБРАБОТЧИКИ ===
+// === ОБРАБОТЧИКИ СОБЫТИЙ ===
 function attachNodeHandlers(selection) {
   if (!IS_MOBILE) {
     selection.on('mouseenter', (event, d) => {
@@ -685,30 +661,7 @@ function attachNodeHandlers(selection) {
 
     selection.on('mouseover', (event, d) => {
       if (pinnedNodeId === d.data.id) return;
-
-      const genLabel = d.depth === 0 ? 'Младшее поколение' : `${d.depth}-е поколение от младшего`;
-      const genderLabel = d.data.gender === 'male' ? 'Мужской' : 'Женский';
-      const generatedLabel = d.data.isGenerated ? '<div class="row" style="color:#a06bff">✨ Восстановлено по роду</div>' : '';
-      const displayName = d.data.name || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
-
-      let linkHtml = '';
-      if (d.data.link && d.data.link.trim().length > 0) {
-        linkHtml = `<button class="btn-open-link" onclick="window.open('${d.data.link}', '_blank', 'noopener,noreferrer')">🔗 Открыть ссылку</button>`;
-      }
-
-      tooltip
-        .style('opacity', 1)
-        .html(`
-          <strong>${displayName}</strong>
-          <div class="row">Дата рождения: <span>${d.data.birth || 'неизвестна'}</span></div>
-          <div class="row">Поколение: <span>${genLabel}</span></div>
-          <div class="row">Пол: <span>${genderLabel}</span></div>
-          ${d.children ? `<div class="row">Предков выше: <span>${d.children.length}</span></div>` : ''}
-          ${generatedLabel}
-          ${linkHtml}
-        `)
-        .style('left', (event.pageX + 15) + 'px')
-        .style('top', (event.pageY - 15) + 'px');
+      showTooltipForNode(d, event);
     });
 
     selection.on('mousemove', (event) => {
@@ -722,7 +675,6 @@ function attachNodeHandlers(selection) {
     });
   }
 
-  // === CLICK — закрепить/снять без скачков ===
   selection.on('click', (event, d) => {
     event.stopPropagation();
 
@@ -741,7 +693,6 @@ function attachNodeHandlers(selection) {
 
     pauseBreathingFor(1200);
 
-    // Сбрасываем смещение дыхания в 0 для предотвращения рывков
     nodeLayer.selectAll('.node').attr('transform', function(nodeData) {
       const bX = nodeData.xIdeal !== undefined ? nodeData.xIdeal : nodeData.x;
       const bY = nodeData.yIdeal !== undefined ? nodeData.yIdeal : nodeData.y;
@@ -762,7 +713,7 @@ function attachNodeHandlers(selection) {
     animateAncestorWave(d);
 
     if (IS_MOBILE) {
-      showMobileTooltip(d, event);
+      showTooltipForNode(d, event);
     }
 
     if (CONFIG.infiniteRoots.enabled && !d._childrenLoaded) {
@@ -968,7 +919,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// === ДЫХАНИЕ ===
+// === ЭФФЕКТ ДЫХАНИЯ ДРЕВА ===
 if (CONFIG.breathing.enabled) {
   const startTime = Date.now();
   let zoomActive = false;
