@@ -1,6 +1,6 @@
 /**
  * Семейное древо Узун — D3.js + бесконечные корни
- * С обновленной логикой задержки тултипа (2 секунды / удержание для клика)
+ * С разделением линий по полу и автоскрытием тултипа
  */
 
 const IS_MOBILE = window.innerWidth < 768;
@@ -139,8 +139,9 @@ let pinnedNodeId = null;
 let breathingPaused = false;
 let breathingResumeTimer = null;
 
-// ✨ Переменные для логики 2-секундного удержания тултипа
+// Переменные для логики тултипа
 let tooltipHideTimer = null;
+let tooltipMaxLifeTimer = null;
 let isMouseOverTooltip = false;
 
 // Отслеживание наведения на сам тултип
@@ -148,6 +149,7 @@ tooltip
   .on('mouseenter', () => {
     isMouseOverTooltip = true;
     clearTimeout(tooltipHideTimer);
+    clearTimeout(tooltipMaxLifeTimer);
   })
   .on('mouseleave', () => {
     isMouseOverTooltip = false;
@@ -300,8 +302,10 @@ function getInitials(name) {
   return parts[0] ? parts[0][0].toUpperCase() : '?';
 }
 
-// === БЕЗОПАСНЫЙ ПОКАЗ ТУЛТИПА С КНОПКОЙ ===
+// === ПОКАЗ ТУЛТИПА С АВТОСКРЫТИЕМ ЧЕРЕЗ ВРЕМЯ ===
 function showTooltipForNode(d, event) {
+  clearTimeout(tooltipMaxLifeTimer);
+
   const genLabel = d.depth === 0 ? 'Младшее поколение' : `${d.depth}-е поколение от младшего`;
   const genderLabel = d.data.gender === 'male' ? 'Мужской' : 'Женский';
   const displayName = d.data.name || (d.data.gender === 'male' ? 'Неизвестный предок' : 'Неизвестная предок');
@@ -340,6 +344,15 @@ function showTooltipForNode(d, event) {
     .style('opacity', 1)
     .style('left', Math.min(screenX, window.innerWidth - 300) + 'px')
     .style('top', Math.max(screenY - 80, 60) + 'px');
+
+  // Плашка всё равно исчезнет через 7 секунд, если её не закрепить или не навести на неё мышь
+  if (!pinnedNodeId) {
+    tooltipMaxLifeTimer = setTimeout(() => {
+      if (!isMouseOverTooltip && !pinnedNodeId) {
+        tooltip.style('opacity', 0);
+      }
+    }, 7000);
+  }
 
   if (IS_MOBILE) {
     clearTimeout(window._mobileTooltipTimer);
@@ -479,7 +492,7 @@ function showDepthStatus() {
   }
 }
 
-// === РЕНДЕР ДРЕВА ===
+// === РЕНДЕР ДРЕВА (С ЦВЕТОМ ЛИНИЙ ПО ПОЛУ) ===
 let links = linkLayer.selectAll('.link');
 let nodes = nodeLayer.selectAll('.node');
 let pulses = pulseLayer.selectAll('.pulse');
@@ -496,7 +509,9 @@ function renderTree(animateEntrance = false) {
     .attr('d', organicLink)
     .attr('stroke', d => {
       const { opacity } = getGenerationStyle(d.target.depth);
-      return `rgba(74, 158, 255, ${opacity * 0.5})`;
+      const isMale = d.target.data.gender === 'male';
+      const colorRGB = isMale ? '74, 158, 255' : '255, 107, 176'; // Голубой для мужчин, розоватый для женщин
+      return `rgba(${colorRGB}, ${opacity * 0.5})`;
     })
     .attr('stroke-width', d => {
       const { scale } = getGenerationStyle(d.target.depth);
@@ -673,7 +688,7 @@ function unpinNode(id) {
   tooltip.style('opacity', 0);
 }
 
-// === ОБРАБОТЧИКИ СОБЫТИЙ (ПРАВИЛО 2 СЕКУНД) ===
+// === ОБРАБОТЧИКИ СОБЫТИЙ С ПРАВИЛОМ 2 СЕКУНД ===
 function attachNodeHandlers(selection) {
   if (!IS_MOBILE) {
     selection.on('mouseenter', (event, d) => {
@@ -708,6 +723,7 @@ function attachNodeHandlers(selection) {
   selection.on('click', (event, d) => {
     event.stopPropagation();
     clearTimeout(tooltipHideTimer);
+    clearTimeout(tooltipMaxLifeTimer);
 
     if (pinnedNodeId === d.data.id) {
       unpinNode(d.data.id);
@@ -826,7 +842,9 @@ function resetHighlight() {
     .classed('dimmed', false)
     .attr('stroke', d => {
       const { opacity } = getGenerationStyle(d.target.depth);
-      return `rgba(74, 158, 255, ${opacity * 0.5})`;
+      const isMale = d.target.data.gender === 'male';
+      const colorRGB = isMale ? '74, 158, 255' : '255, 107, 176';
+      return `rgba(${colorRGB}, ${opacity * 0.5})`;
     });
 }
 
