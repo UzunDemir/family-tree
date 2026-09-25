@@ -673,7 +673,7 @@ function pinNode(d) {
     .attr('class', 'pin-badge')
     .attr('x', cardW / 2 - 12)
     .attr('y', -cardH / 2 + 12)
-    .text('📌');
+    .text('');
 
   const screenX = width / 2 + (d.x + offsetX - width / 2);
   const screenY = height / 2 + (d.y + offsetY - height / 2);
