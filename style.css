@@ -98,35 +98,6 @@ html, body {
   pointer-events: none;
 }
 
-/* === КНОПКА-ССЫЛКА === */
-.link-button {
-  cursor: pointer;
-  transition: filter 0.2s;
-}
-
-.link-button:hover {
-  filter: drop-shadow(0 0 10px rgba(74, 158, 255, 0.9));
-}
-
-.link-button rect {
-  fill: #4a9eff;
-  stroke: #6bb0ff;
-  stroke-width: 1;
-}
-
-.link-button:hover rect {
-  fill: #6bb0ff;
-}
-
-.link-button text {
-  fill: #ffffff;
-  font-size: 11px;
-  font-weight: 700;
-  text-anchor: middle;
-  dominant-baseline: central;
-  pointer-events: none;
-}
-
 /* === ТЕКСТ КАРТОЧКИ === */
 .card-name {
   fill: #e0e0ff;
@@ -188,7 +159,6 @@ html, body {
   padding: 14px 18px;
   color: #e0e0ff;
   font-size: 13px;
-  pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s;
   box-shadow: 0 8px 32px rgba(74, 158, 255, 0.3);
@@ -210,6 +180,28 @@ html, body {
 }
 
 .tooltip .row span { color: #e0e0ff; }
+
+/* === КНОПКА ОТКРЫТЬ В ТУЛТИПЕ === */
+.tooltip .btn-open-link {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  background: #4a9eff;
+  color: #ffffff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.2s, filter 0.2s;
+}
+
+.tooltip .btn-open-link:hover {
+  background: #6bb0ff;
+  filter: drop-shadow(0 0 8px rgba(74, 158, 255, 0.8));
+}
 
 /* === КНОПКИ УПРАВЛЕНИЯ === */
 #controls {
@@ -321,49 +313,4 @@ html, body {
   .card-name { font-size: 11px !important; }
   .card-date { font-size: 9px !important; }
   .avatar-text { font-size: 13px !important; }
-}
-
-@media (max-width: 400px) {
-  #header h1 { font-size: 14px; }
-
-  #controls {
-    bottom: 45px;
-    gap: 4px;
-  }
-
-  #controls button {
-    padding: 6px 8px;
-    font-size: 10px;
-  }
-
-  #footer { font-size: 9px; }
-
-  .card-name { font-size: 10px !important; }
-  .card-date { font-size: 8px !important; }
-  .avatar-text { font-size: 12px !important; }
-}
-
-@media (max-height: 500px) and (orientation: landscape) {
-  #header { padding: 8px 16px; }
-  #header h1 { font-size: 14px; }
-
-  #controls {
-    right: 12px;
-    bottom: 12px;
-    left: auto;
-    flex-direction: column;
-    padding: 0;
-    flex-wrap: nowrap;
-  }
-
-  #controls button {
-    padding: 6px 8px;
-    font-size: 10px;
-  }
-
-  #footer {
-    bottom: 8px;
-    left: 12px;
-    font-size: 9px;
-  }
 }
