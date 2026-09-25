@@ -718,7 +718,7 @@ function pinNode(d) {
     .attr('class', 'pin-badge')
     .attr('x', cardW / 2 - 12)
     .attr('y', -cardH / 2 + 12)
-    .text('📌');
+    .text('');
 
   if (d.data.link && d.data.link.trim().length > 0) {
     const btnWidth = 100;
